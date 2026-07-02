@@ -8,6 +8,7 @@ import { SubjectsModule } from './modules/subjects/subjects.module';
 import { QuestionsModule } from './modules/questions/questions.module';
 import { ExamsModule } from './modules/exams/exams.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
+import { AttemptsModule } from './modules/attempts/attempts.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -30,6 +31,8 @@ import { validateEnv } from './config/env.validation';
     ExamsModule,
     // SessionsModule : planification des sessions (routes /api/sessions/...).
     SessionsModule,
+    // AttemptsModule : passage d'évaluation côté étudiant.
+    AttemptsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

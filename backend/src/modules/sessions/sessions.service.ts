@@ -88,6 +88,31 @@ export class SessionsService {
     });
   }
 
+  /**
+   * Charge une session avec son examen et toute la composition
+   * (questions + options). Utilisé par AttemptsService pour démarrer
+   * une tentative. Lève 404 si absente.
+   */
+  async findWithComposition(id: string) {
+    const session = await this.prisma.session.findUnique({
+      where: { id },
+      include: {
+        exam: {
+          include: {
+            examQuestions: {
+              orderBy: { order: 'asc' },
+              include: { question: { include: { options: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!session) {
+      throw new NotFoundException('Session introuvable.');
+    }
+    return session;
+  }
+
   /** Détail (404 si absente). */
   async findOne(id: string) {
     const session = await this.prisma.session.findUnique({
