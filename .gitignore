@@ -1,0 +1,30 @@
+# ---------- Dépendances ----------
+# On ne versionne JAMAIS node_modules : c'est lourd et reconstruit via "npm install".
+node_modules/
+
+# ---------- Variables d'environnement (SECRETS) ----------
+# On ignore les vrais .env. Seul .env.example (le modèle) est versionné.
+.env
+.env.local
+.env.*.local
+*.env
+
+# ---------- Builds / sorties de compilation ----------
+dist/
+build/
+coverage/
+
+# ---------- Logs ----------
+*.log
+npm-debug.log*
+logs/
+
+# ---------- Fichiers système / IDE ----------
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# ---------- Divers ----------
+*.tsbuildinfo

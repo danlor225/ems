@@ -1,0 +1,50 @@
+# ============================================================
+#  EMS — Orchestration des services de développement
+#  Lancer :  docker compose up -d      (démarre en arrière-plan)
+#  Arrêter : docker compose down        (arrête, GARDE les données)
+#  Reset   : docker compose down -v     (arrête et SUPPRIME les données)
+#
+#  En dev, seule la base de données tourne dans Docker.
+#  Le backend NestJS tourne sur la machine hôte (npm run start:dev).
+# ============================================================
+
+services:
+  # ---------- Base de données PostgreSQL ----------
+  postgres:
+    image: postgres:16-alpine            # version figée + image légère (alpine)
+    container_name: ems_postgres         # nom lisible du conteneur
+    restart: unless-stopped              # redémarre tout seul sauf si on l'arrête volontairement
+    environment:
+      # Ces valeurs sont lues depuis le fichier .env (à la racine).
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # "hôte:conteneur" — on publie le port du conteneur vers ta machine.
+      # Grâce à ça, le backend (sur l'hôte) joint la base via localhost:5432.
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      # Les données vivent dans un volume nommé => elles SURVIVENT à la suppression du conteneur.
+      - ems_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Docker vérifie régulièrement que la base est VRAIMENT prête à accepter des connexions.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------- Adminer : interface web pour visualiser la base ----------
+  # Optionnel mais très pédagogique : permet de "voir" les tables dans le navigateur.
+  adminer:
+    image: adminer:4
+    container_name: ems_adminer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy       # attend que la base soit saine avant de démarrer
+    ports:
+      - "8080:8080"                       # interface accessible sur http://localhost:8080
+
+# Déclaration du volume persistant utilisé ci-dessus.
+volumes:
+  ems_pgdata:

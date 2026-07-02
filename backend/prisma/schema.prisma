@@ -1,0 +1,237 @@
+// ============================================================
+//  EMS — Schéma Prisma (source de vérité du modèle de données)
+//  Doc : https://pris.ly/d/prisma-schema
+//
+//  Conventions :
+//   - Modèles en PascalCase (côté TypeScript).
+//   - Tables/colonnes physiques en snake_case (via @@map / @map).
+//   - Identifiants en UUID (anti-énumération / IDOR - OWASP A01).
+//   - Dates en timestamptz (DateTime de Prisma sur PostgreSQL).
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------
+//  ÉNUMÉRATIONS
+// ------------------------------------------------------------
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum QuestionType {
+  SINGLE_CHOICE // QCM à réponse unique (extensible plus tard)
+}
+
+enum SessionStatus {
+  SCHEDULED // planifiée, pas encore ouverte
+  OPEN      // ouverte : les étudiants peuvent passer
+  CLOSED    // fermée
+}
+
+enum AttemptStatus {
+  IN_PROGRESS // tentative en cours
+  SUBMITTED   // soumise (score calculé)
+  EXPIRED     // temps écoulé sans soumission
+}
+
+// ------------------------------------------------------------
+//  UTILISATEURS & AUTHENTIFICATION
+// ------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique // stocké en minuscules (normalisé côté application)
+  passwordHash String   @map("password_hash") // JAMAIS le mot de passe en clair (bcrypt)
+  firstName    String   @map("first_name") @db.VarChar(100)
+  lastName     String   @map("last_name") @db.VarChar(100)
+  role         Role     @default(STUDENT)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  refreshTokens RefreshToken[]
+  attempts      Attempt[]
+  activityLogs  ActivityLog[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tokenHash String   @map("token_hash") // on stocke le HASH du token, pas le token
+  expiresAt DateTime @map("expires_at")
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ------------------------------------------------------------
+//  CONTENU PÉDAGOGIQUE
+// ------------------------------------------------------------
+
+model Subject {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(150)
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  questions Question[]
+  exams     Exam[]
+
+  @@map("subjects")
+}
+
+model Question {
+  id        String       @id @default(uuid()) @db.Uuid
+  subjectId String       @map("subject_id") @db.Uuid
+  statement String
+  points    Int          @default(1)
+  type      QuestionType @default(SINGLE_CHOICE)
+  isActive  Boolean      @default(true) @map("is_active") // soft-delete : on désactive, on ne supprime pas
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  // Restrict : on ne supprime pas une matière encore utilisée par des questions.
+  subject        Subject         @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  options        AnswerOption[]
+  examQuestions  ExamQuestion[]
+  attemptAnswers AttemptAnswer[]
+
+  @@index([subjectId])
+  @@map("questions")
+}
+
+model AnswerOption {
+  id         String  @id @default(uuid()) @db.Uuid
+  questionId String  @map("question_id") @db.Uuid
+  text       String
+  isCorrect  Boolean @default(false) @map("is_correct") // NE DOIT JAMAIS sortir vers l'étudiant en épreuve
+
+  question          Question        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedInAnswers AttemptAnswer[]
+
+  @@index([questionId])
+  @@map("answer_options")
+}
+
+// ------------------------------------------------------------
+//  EXAMENS & SESSIONS
+// ------------------------------------------------------------
+
+model Exam {
+  id              String   @id @default(uuid()) @db.Uuid
+  subjectId       String   @map("subject_id") @db.Uuid
+  title           String   @db.VarChar(200)
+  durationMinutes Int      @map("duration_minutes") // durée configurable
+  passScore       Int      @default(50) @map("pass_score") // seuil de réussite (%) configurable par examen
+  isPublished     Boolean  @default(false) @map("is_published")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  subject       Subject        @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  examQuestions ExamQuestion[]
+  sessions      Session[]
+
+  @@index([subjectId])
+  @@map("exams")
+}
+
+// Table de jointure Exam <-> Question (un examen se compose de N questions).
+model ExamQuestion {
+  examId     String @map("exam_id") @db.Uuid
+  questionId String @map("question_id") @db.Uuid
+  order      Int // ordre "de référence" (l'ordre affiché est tiré au hasard par tentative)
+
+  exam     Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@id([examId, questionId]) // clé primaire composite : une question au plus une fois par examen
+  @@index([questionId])
+  @@map("exam_questions")
+}
+
+model Session {
+  id       String        @id @default(uuid()) @db.Uuid
+  examId   String        @map("exam_id") @db.Uuid
+  opensAt  DateTime      @map("opens_at")
+  closesAt DateTime      @map("closes_at")
+  status   SessionStatus @default(SCHEDULED)
+
+  exam     Exam      @relation(fields: [examId], references: [id], onDelete: Restrict)
+  attempts Attempt[]
+
+  @@index([examId])
+  @@map("sessions")
+}
+
+// ------------------------------------------------------------
+//  PASSATION (le coeur métier)
+// ------------------------------------------------------------
+
+model Attempt {
+  id            String        @id @default(uuid()) @db.Uuid
+  sessionId     String        @map("session_id") @db.Uuid
+  studentId     String        @map("student_id") @db.Uuid
+  startedAt     DateTime      @map("started_at")
+  expiresAt     DateTime      @map("expires_at") // MINUTEUR SERVEUR : fait autorité
+  submittedAt   DateTime?     @map("submitted_at")
+  status        AttemptStatus @default(IN_PROGRESS)
+  score         Float? // calculé à la soumission
+  questionOrder Json          @map("question_order") // ordre aléatoire des questions, FIGÉ par tentative
+
+  session Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student User            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers AttemptAnswer[]
+
+  @@unique([sessionId, studentId]) // RÈGLE MÉTIER : une seule tentative par étudiant et par session
+  @@index([studentId])
+  @@map("attempts")
+}
+
+model AttemptAnswer {
+  id               String   @id @default(uuid()) @db.Uuid
+  attemptId        String   @map("attempt_id") @db.Uuid
+  questionId       String   @map("question_id") @db.Uuid
+  selectedOptionId String?  @map("selected_option_id") @db.Uuid // null tant que pas répondu
+  optionOrder      Json     @map("option_order") // ordre aléatoire des réponses, FIGÉ par tentative
+  answeredAt       DateTime @default(now()) @map("answered_at")
+
+  attempt        Attempt       @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question       Question      @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  selectedOption AnswerOption? @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
+
+  @@unique([attemptId, questionId]) // une seule réponse enregistrée par question => permet la sauvegarde auto (upsert)
+  @@map("attempt_answers")
+}
+
+// ------------------------------------------------------------
+//  JOURNALISATION (audit - OWASP A09)
+// ------------------------------------------------------------
+
+model ActivityLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid // null si l'acteur a été supprimé
+  action    String   @db.VarChar(100) // ex: "EXAM_CREATED"
+  entity    String?  @db.VarChar(100) // ex: "Exam"
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
