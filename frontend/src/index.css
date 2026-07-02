@@ -1,0 +1,20 @@
+/* Tailwind v4 : un seul import active tout le framework. */
+@import "tailwindcss";
+
+/* ------------------------------------------------------------
+   Design tokens de la charte EMS (déclarés dans @theme).
+   Chaque --color-* génère automatiquement des utilitaires
+   Tailwind : bg-ems-primary, text-ems-primary, border-ems-sky...
+   ------------------------------------------------------------ */
+@theme {
+  --color-ems-primary: #1d4ed8; /* Bleu primaire */
+  --color-ems-dark: #1e3a8a;    /* Bleu foncé */
+  --color-ems-sky: #60a5fa;     /* Bleu ciel */
+  --color-ems-bg: #f2f4f7;      /* Fond neutre */
+
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  @apply bg-ems-bg text-slate-800 font-sans antialiased;
+}
