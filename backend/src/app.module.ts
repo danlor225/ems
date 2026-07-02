@@ -9,6 +9,9 @@ import { QuestionsModule } from './modules/questions/questions.module';
 import { ExamsModule } from './modules/exams/exams.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { AttemptsModule } from './modules/attempts/attempts.module';
+import { ResultsModule } from './modules/results/results.module';
+import { StatsModule } from './modules/stats/stats.module';
+import { ActivityLogModule } from './modules/activity-log/activity-log.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -33,6 +36,12 @@ import { validateEnv } from './config/env.validation';
     SessionsModule,
     // AttemptsModule : passage d'évaluation côté étudiant.
     AttemptsModule,
+    // ResultsModule : consultation des résultats (staff).
+    ResultsModule,
+    // StatsModule : statistiques du tableau de bord (staff).
+    StatsModule,
+    // ActivityLogModule (@Global) : audit des actions sensibles.
+    ActivityLogModule,
   ],
   controllers: [AppController],
   providers: [AppService],

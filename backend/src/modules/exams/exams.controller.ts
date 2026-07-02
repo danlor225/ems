@@ -16,9 +16,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import type { SafeUser } from '../auth/auth.service';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { ExamQueryDto } from './dto/exam-query.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
@@ -31,8 +33,8 @@ export class ExamsController {
   constructor(private readonly examsService: ExamsService) {}
 
   @Post()
-  create(@Body() dto: CreateExamDto) {
-    return this.examsService.create(dto);
+  create(@Body() dto: CreateExamDto, @CurrentUser() user: SafeUser) {
+    return this.examsService.create(dto, user.id);
   }
 
   @Get()
@@ -52,8 +54,8 @@ export class ExamsController {
 
   @Post(':id/publish')
   @HttpCode(HttpStatus.OK)
-  publish(@Param('id', ParseUUIDPipe) id: string) {
-    return this.examsService.publish(id);
+  publish(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: SafeUser) {
+    return this.examsService.publish(id, user.id);
   }
 
   @Post(':id/unpublish')
@@ -64,7 +66,7 @@ export class ExamsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.examsService.remove(id);
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: SafeUser) {
+    return this.examsService.remove(id, user.id);
   }
 }

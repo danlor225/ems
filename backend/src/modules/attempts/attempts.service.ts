@@ -25,6 +25,19 @@ type SessionWithComposition = Prisma.SessionGetPayload<{
   };
 }>;
 type AttemptWithAnswers = Prisma.AttemptGetPayload<{ include: { answers: true } }>;
+type AttemptForResult = Prisma.AttemptGetPayload<{
+  include: {
+    answers: true;
+    student: {
+      select: { id: true; firstName: true; lastName: true; email: true };
+    };
+    session: {
+      include: {
+        exam: { select: { title: true; passScore: true; durationMinutes: true } };
+      };
+    };
+  };
+}>;
 
 /** Mélange un tableau (Fisher-Yates). Non critique => Math.random suffit. */
 function shuffle<T>(input: T[]): T[] {
@@ -203,12 +216,41 @@ export class AttemptsService {
     };
   }
 
-  /** Résultat détaillé (correction) d'une tentative soumise. */
+  /** Résultat détaillé (correction) pour l'ÉTUDIANT propriétaire. */
   async getResult(studentId: string, attemptId: string) {
-    const attempt = await this.prisma.attempt.findUnique({
+    const attempt = await this.loadAttemptForResult(attemptId);
+    if (!attempt || attempt.studentId !== studentId) {
+      throw new NotFoundException('Tentative introuvable.');
+    }
+    if (attempt.status === 'IN_PROGRESS') {
+      throw new ConflictException(
+        "Résultat indisponible : l'évaluation n'est pas encore soumise.",
+      );
+    }
+    return this.buildResult(attempt);
+  }
+
+  /** Résultat détaillé pour le STAFF (enseignant/admin), sans ownership. */
+  async getResultForStaff(attemptId: string) {
+    const attempt = await this.loadAttemptForResult(attemptId);
+    if (!attempt) {
+      throw new NotFoundException('Tentative introuvable.');
+    }
+    if (attempt.status === 'IN_PROGRESS') {
+      throw new ConflictException("L'évaluation n'est pas encore soumise.");
+    }
+    return this.buildResult(attempt);
+  }
+
+  /** Charge une tentative avec tout le nécessaire au calcul du résultat. */
+  private loadAttemptForResult(attemptId: string) {
+    return this.prisma.attempt.findUnique({
       where: { id: attemptId },
       include: {
         answers: true,
+        student: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
         session: {
           include: {
             exam: {
@@ -218,17 +260,10 @@ export class AttemptsService {
         },
       },
     });
+  }
 
-    if (!attempt || attempt.studentId !== studentId) {
-      throw new NotFoundException('Tentative introuvable.');
-    }
-    if (attempt.status === 'IN_PROGRESS') {
-      throw new ConflictException(
-        "Résultat indisponible : l'évaluation n'est pas encore soumise.",
-      );
-    }
-
-    // La tentative est terminée : on peut charger les bonnes réponses.
+  /** Construit la correction détaillée d'une tentative terminée. */
+  private async buildResult(attempt: AttemptForResult) {
     const questionIds = attempt.answers.map((a) => a.questionId);
     const questions = await this.prisma.question.findMany({
       where: { id: { in: questionIds } },
@@ -271,6 +306,7 @@ export class AttemptsService {
         score: attempt.score,
         submittedAt: attempt.submittedAt,
       },
+      student: attempt.student,
       exam: {
         title: attempt.session.exam.title,
         passScore,

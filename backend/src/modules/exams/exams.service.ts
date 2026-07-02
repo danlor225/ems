@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 import { QuestionsService } from '../questions/questions.service';
 import { SubjectsService } from '../subjects/subjects.service';
 import { CreateExamDto } from './dto/create-exam.dto';
@@ -25,10 +26,11 @@ export class ExamsService {
     private readonly prisma: PrismaService,
     private readonly subjectsService: SubjectsService,
     private readonly questionsService: QuestionsService,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   /** Crée un examen (brouillon) avec sa composition de questions. */
-  async create(dto: CreateExamDto) {
+  async create(dto: CreateExamDto, actorId: string) {
     await this.subjectsService.findOne(dto.subjectId); // 404 si matière absente
 
     // Pas de doublon dans la composition.
@@ -49,7 +51,7 @@ export class ExamsService {
       );
     }
 
-    return this.prisma.exam.create({
+    const exam = await this.prisma.exam.create({
       data: {
         title: dto.title,
         subjectId: dto.subjectId,
@@ -64,6 +66,14 @@ export class ExamsService {
       },
       include: { examQuestions: true },
     });
+
+    await this.activityLog.log({
+      actorId,
+      action: 'EXAM_CREATED',
+      entity: 'Exam',
+      metadata: { examId: exam.id, title: exam.title },
+    });
+    return exam;
   }
 
   /** Liste paginée, filtrable par matière. */
@@ -113,7 +123,7 @@ export class ExamsService {
   }
 
   /** Publication : vérifie le nombre de questions (15–20) et leur activité. */
-  async publish(id: string) {
+  async publish(id: string, actorId: string) {
     const exam = await this.prisma.exam.findUnique({
       where: { id },
       include: { examQuestions: { include: { question: true } } },
@@ -136,10 +146,17 @@ export class ExamsService {
       );
     }
 
-    return this.prisma.exam.update({
+    const updated = await this.prisma.exam.update({
       where: { id },
       data: { isPublished: true },
     });
+    await this.activityLog.log({
+      actorId,
+      action: 'EXAM_PUBLISHED',
+      entity: 'Exam',
+      metadata: { examId: id },
+    });
+    return updated;
   }
 
   /** Dépublication. */
@@ -152,10 +169,16 @@ export class ExamsService {
   }
 
   /** Suppression (404 si absent, 409 si des sessions y sont rattachées). */
-  async remove(id: string): Promise<void> {
+  async remove(id: string, actorId: string): Promise<void> {
     await this.ensureExists(id);
     try {
       await this.prisma.exam.delete({ where: { id } });
+      await this.activityLog.log({
+        actorId,
+        action: 'EXAM_DELETED',
+        entity: 'Exam',
+        metadata: { examId: id },
+      });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
