@@ -20,6 +20,10 @@ interface AuthContextValue {
   isBootstrapping: boolean
   login: (email: string, password: string) => Promise<AuthUser>
   register: (input: RegisterInput) => Promise<AuthUser>
+  updateProfile: (input: {
+    firstName?: string
+    lastName?: string
+  }) => Promise<AuthUser>
   logout: () => Promise<void>
 }
 
@@ -67,6 +71,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return login(input.email, input.password)
   }
 
+  // Met à jour le profil et rafraîchit l'utilisateur en mémoire.
+  async function updateProfile(input: {
+    firstName?: string
+    lastName?: string
+  }) {
+    const updated = await authApi.updateProfile(input)
+    setUser(updated)
+    return updated
+  }
+
   async function logout() {
     const refreshToken = tokenStore.getRefreshToken()
     if (refreshToken) {
@@ -80,7 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isBootstrapping, login, register, logout }}
+      value={{
+        user,
+        isBootstrapping,
+        login,
+        register,
+        updateProfile,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>

@@ -26,4 +26,17 @@ export class UsersService {
   create(data: Prisma.UserCreateInput): Promise<User> {
     return this.prisma.user.create({ data });
   }
+
+  /** Met à jour le profil (prénom / nom). */
+  updateProfile(
+    id: string,
+    data: { firstName?: string; lastName?: string },
+  ): Promise<User> {
+    return this.prisma.user.update({ where: { id }, data });
+  }
+
+  /** Met à jour le hash du mot de passe. */
+  updatePassword(id: string, passwordHash: string): Promise<User> {
+    return this.prisma.user.update({ where: { id }, data: { passwordHash } });
+  }
 }

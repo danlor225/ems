@@ -1,21 +1,22 @@
 // ============================================================
-//  QuestionsPage : CRUD des questions.
-//  - formulaire : matière + énoncé + options dynamiques (useFieldArray)
-//    + choix de LA bonne réponse (radio correctIndex).
-//  - liste filtrable par matière.
+//  QuestionsPage — CRUD Questions (design system).
+//  Options dynamiques (useFieldArray) + bonne réponse (radio).
 // ============================================================
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
+import { Plus, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Textarea } from '@/components/ui/textarea'
 import { getSubjects } from '../subjects/subjectsApi'
-import {
-  createQuestion,
-  deleteQuestion,
-  getQuestions,
-} from './questionsApi'
+import { createQuestion, deleteQuestion, getQuestions } from './questionsApi'
 
 const schema = z
   .object({
@@ -31,7 +32,6 @@ const schema = z
     message: 'La bonne réponse doit correspondre à une option.',
     path: ['correctIndex'],
   })
-
 type FormValues = z.infer<typeof schema>
 
 export function QuestionsPage() {
@@ -92,150 +92,150 @@ export function QuestionsPage() {
   const del = useMutation({
     mutationFn: (id: string) => deleteQuestion(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['questions'] }),
-    onError: (error) => {
-      if (axios.isAxiosError(error) && error.response?.status === 409) {
-        setActionError('Question utilisée par un examen : suppression impossible.')
-      } else {
-        setActionError('Erreur lors de la suppression.')
-      }
-    },
+    onError: (error) =>
+      setActionError(
+        axios.isAxiosError(error) && error.response?.status === 409
+          ? 'Question utilisée par un examen : suppression impossible.'
+          : 'Erreur lors de la suppression.',
+      ),
   })
 
   return (
-    <div>
-      <h1 className="mb-6 text-xl font-bold text-slate-800">Questions</h1>
+    <div className="space-y-6">
+      <h1 className="text-xl font-bold tracking-tight text-foreground">
+        Questions
+      </h1>
 
-      {/* Formulaire de création */}
-      <form
-        onSubmit={handleSubmit((v) => create.mutate(v))}
-        className="mb-6 space-y-4 rounded-2xl bg-white p-5 shadow-sm"
-      >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Matière
-            </label>
-            <select
-              {...register('subjectId')}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary"
-              defaultValue=""
-            >
-              <option value="" disabled>
-                Choisir une matière…
-              </option>
-              {subjects?.data.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            {errors.subjectId && (
-              <p className="mt-1 text-xs text-red-600">
-                {errors.subjectId.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Points
-            </label>
-            <input
-              type="number"
-              min={1}
-              {...register('points', { valueAsNumber: true })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">
-            Énoncé
-          </label>
-          <textarea
-            {...register('statement')}
-            rows={2}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary"
-            placeholder="Quelle est la question ?"
-          />
-          {errors.statement && (
-            <p className="mt-1 text-xs text-red-600">
-              {errors.statement.message}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label className="mb-2 block text-sm font-medium text-slate-700">
-            Réponses (cochez la bonne)
-          </label>
-          <div className="space-y-2">
-            {fields.map((field, index) => (
-              <div key={field.id} className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  value={index}
-                  {...register('correctIndex', { valueAsNumber: true })}
-                  className="h-4 w-4 accent-ems-primary"
-                />
-                <input
-                  {...register(`options.${index}.text`)}
-                  placeholder={`Réponse ${index + 1}`}
-                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary"
-                />
-                {fields.length > 2 && (
-                  <button
-                    type="button"
-                    onClick={() => removeOption(index)}
-                    className="text-xs text-red-600 hover:underline"
-                  >
-                    Retirer
-                  </button>
+      {/* Création */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Nouvelle question</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={handleSubmit((v) => create.mutate(v))}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="space-y-1.5 md:col-span-2">
+                <Label htmlFor="subjectId">Matière</Label>
+                <NativeSelect
+                  id="subjectId"
+                  defaultValue=""
+                  aria-invalid={!!errors.subjectId}
+                  {...register('subjectId')}
+                >
+                  <option value="" disabled>
+                    Choisir une matière…
+                  </option>
+                  {subjects?.data.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+                {errors.subjectId && (
+                  <p className="text-xs text-danger">
+                    {errors.subjectId.message}
+                  </p>
                 )}
               </div>
-            ))}
-          </div>
-          {errors.options && (
-            <p className="mt-1 text-xs text-red-600">
-              {errors.options.message ?? errors.options.root?.message}
-            </p>
-          )}
-          {errors.correctIndex && (
-            <p className="mt-1 text-xs text-red-600">
-              {errors.correctIndex.message}
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={() => append({ text: '' })}
-            className="mt-2 text-sm font-medium text-ems-primary hover:underline"
-          >
-            + Ajouter une réponse
-          </button>
-        </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="points">Points</Label>
+                <Input
+                  id="points"
+                  type="number"
+                  min={1}
+                  {...register('points', { valueAsNumber: true })}
+                />
+              </div>
+            </div>
 
-        <button
-          type="submit"
-          disabled={create.isPending}
-          className="rounded-lg bg-ems-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-        >
-          {create.isPending ? 'Création…' : 'Créer la question'}
-        </button>
-      </form>
+            <div className="space-y-1.5">
+              <Label htmlFor="statement">Énoncé</Label>
+              <Textarea
+                id="statement"
+                rows={2}
+                placeholder="Quelle est la question ?"
+                aria-invalid={!!errors.statement}
+                {...register('statement')}
+              />
+              {errors.statement && (
+                <p className="text-xs text-danger">
+                  {errors.statement.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Réponses (cochez la bonne)</Label>
+              {fields.map((field, index) => (
+                <div key={field.id} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    value={index}
+                    aria-label={`Bonne réponse : option ${index + 1}`}
+                    {...register('correctIndex', { valueAsNumber: true })}
+                    className="size-4 accent-primary"
+                  />
+                  <Input
+                    className="flex-1"
+                    placeholder={`Réponse ${index + 1}`}
+                    {...register(`options.${index}.text`)}
+                  />
+                  {fields.length > 2 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Retirer la réponse"
+                      onClick={() => removeOption(index)}
+                      className="text-muted-foreground hover:text-danger"
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {(errors.options || errors.correctIndex) && (
+                <p className="text-xs text-danger">
+                  {errors.options?.message ??
+                    errors.options?.root?.message ??
+                    errors.correctIndex?.message}
+                </p>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => append({ text: '' })}
+                className="text-primary"
+              >
+                <Plus className="size-4" />
+                Ajouter une réponse
+              </Button>
+            </div>
+
+            <Button type="submit" loading={create.isPending}>
+              Créer la question
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       {actionError && (
-        <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
           {actionError}
         </div>
       )}
 
       {/* Filtre + liste */}
-      <div className="mb-3 flex items-center gap-2">
-        <span className="text-sm text-slate-500">Filtrer :</span>
-        <select
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">Filtrer :</span>
+        <NativeSelect
           value={subjectFilter}
           onChange={(e) => setSubjectFilter(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-ems-primary"
+          className="h-9 w-auto"
         >
           <option value="">Toutes les matières</option>
           {subjects?.data.map((s) => (
@@ -243,43 +243,51 @@ export function QuestionsPage() {
               {s.name}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </div>
 
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+      <Card className="overflow-hidden">
         {isPending ? (
-          <p className="p-6 text-sm text-slate-400">Chargement…</p>
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />
+            ))}
+          </div>
         ) : isError ? (
-          <p className="p-6 text-sm text-red-600">Erreur de chargement.</p>
+          <p className="p-6 text-sm text-danger">Erreur de chargement.</p>
         ) : data.data.length === 0 ? (
-          <p className="p-6 text-sm text-slate-400">Aucune question.</p>
+          <p className="p-10 text-center text-sm text-muted-foreground">
+            Aucune question.
+          </p>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-border">
             {data.data.map((q) => (
               <li
                 key={q.id}
-                className="flex items-start justify-between gap-4 px-5 py-4"
+                className="flex items-start justify-between gap-4 px-4 py-4"
               >
                 <div>
-                  <p className="font-medium text-slate-800">{q.statement}</p>
-                  <p className="mt-1 text-xs text-slate-400">
+                  <p className="font-medium text-foreground">{q.statement}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {subjectName(q.subjectId)} · {q.options.length} réponses ·{' '}
                     {q.points} pt{q.points > 1 ? 's' : ''}
                     {!q.isActive && ' · désactivée'}
                   </p>
                 </div>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Supprimer"
                   onClick={() => del.mutate(q.id)}
-                  className="shrink-0 text-xs font-medium text-red-600 hover:underline"
+                  className="shrink-0 text-muted-foreground hover:text-danger"
                 >
-                  Supprimer
-                </button>
+                  <Trash2 className="size-4" />
+                </Button>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

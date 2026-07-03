@@ -1,5 +1,5 @@
 // ============================================================
-//  ExamsPage : CRUD des examens + composition + publication.
+//  ExamsPage — CRUD Examens + composition + publication (DS).
 // ============================================================
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -7,6 +7,12 @@ import axios from 'axios'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
 import { getQuestions } from '../questions/questionsApi'
 import { getSubjects } from '../subjects/subjectsApi'
 import {
@@ -57,29 +63,21 @@ export function ExamsPage() {
     resolver: zodResolver(schema),
     defaultValues: { durationMinutes: 60, passScore: 50 },
   })
-
   const subjectId = watch('subjectId')
 
-  // Questions de la matière choisie (pour la composition).
   const { data: questions } = useQuery({
     queryKey: ['questions', subjectId],
     queryFn: () => getQuestions(subjectId),
     enabled: !!subjectId,
   })
 
-  // On repart d'une sélection vide quand la matière change.
-  useEffect(() => {
-    setSelected([])
-  }, [subjectId])
+  useEffect(() => setSelected([]), [subjectId])
 
   const toggle = (id: string) =>
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    )
+    setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
 
   const create = useMutation({
-    mutationFn: (v: FormValues) =>
-      createExam({ ...v, questionIds: selected }),
+    mutationFn: (v: FormValues) => createExam({ ...v, questionIds: selected }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exams'] })
       reset()
@@ -88,7 +86,6 @@ export function ExamsPage() {
     },
     onError: (e) => setActionError(axiosMessage(e, 'Erreur lors de la création.')),
   })
-
   const publish = useMutation({
     mutationFn: (id: string) => publishExam(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exams'] }),
@@ -116,192 +113,191 @@ export function ExamsPage() {
     subjects?.data.find((s) => s.id === id)?.name ?? '—'
 
   return (
-    <div>
-      <h1 className="mb-6 text-xl font-bold text-slate-800">Examens</h1>
+    <div className="space-y-6">
+      <h1 className="text-xl font-bold tracking-tight text-foreground">
+        Examens
+      </h1>
 
-      {/* Formulaire de création */}
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="mb-6 space-y-4 rounded-2xl bg-white p-5 shadow-sm"
-      >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Titre
-            </label>
-            <input
-              {...register('title')}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary"
-              placeholder="Ex : Examen final — Algèbre"
-            />
-            {errors.title && (
-              <p className="mt-1 text-xs text-red-600">{errors.title.message}</p>
-            )}
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Matière
-            </label>
-            <select
-              {...register('subjectId')}
-              defaultValue=""
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary"
-            >
-              <option value="" disabled>
-                Choisir…
-              </option>
-              {subjects?.data.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            {errors.subjectId && (
-              <p className="mt-1 text-xs text-red-600">
-                {errors.subjectId.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Durée (minutes)
-            </label>
-            <input
-              type="number"
-              min={1}
-              {...register('durationMinutes', { valueAsNumber: true })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Seuil de réussite (%)
-            </label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              {...register('passScore', { valueAsNumber: true })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary"
-            />
-          </div>
-        </div>
-
-        {/* Composition */}
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <label className="text-sm font-medium text-slate-700">
-              Composition
-            </label>
-            <span className="text-xs text-slate-400">
-              {selected.length} sélectionnée(s) — 15 à 20 requises pour publier
-            </span>
-          </div>
-          {!subjectId ? (
-            <p className="text-sm text-slate-400">
-              Choisissez d’abord une matière.
-            </p>
-          ) : questions && questions.data.length > 0 ? (
-            <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">
-              {questions.data.map((q) => (
-                <label
-                  key={q.id}
-                  className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-slate-50"
+      {/* Création */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Nouvel examen</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="title">Titre</Label>
+                <Input
+                  id="title"
+                  placeholder="Ex : Examen final — Algèbre"
+                  aria-invalid={!!errors.title}
+                  {...register('title')}
+                />
+                {errors.title && (
+                  <p className="text-xs text-danger">{errors.title.message}</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="subjectId">Matière</Label>
+                <NativeSelect
+                  id="subjectId"
+                  defaultValue=""
+                  aria-invalid={!!errors.subjectId}
+                  {...register('subjectId')}
                 >
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(q.id)}
-                    onChange={() => toggle(q.id)}
-                    className="h-4 w-4 accent-ems-primary"
-                  />
-                  <span className="text-slate-700">{q.statement}</span>
-                </label>
-              ))}
+                  <option value="" disabled>
+                    Choisir…
+                  </option>
+                  {subjects?.data.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+                {errors.subjectId && (
+                  <p className="text-xs text-danger">
+                    {errors.subjectId.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="durationMinutes">Durée (minutes)</Label>
+                <Input
+                  id="durationMinutes"
+                  type="number"
+                  min={1}
+                  {...register('durationMinutes', { valueAsNumber: true })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="passScore">Seuil de réussite (%)</Label>
+                <Input
+                  id="passScore"
+                  type="number"
+                  min={0}
+                  max={100}
+                  {...register('passScore', { valueAsNumber: true })}
+                />
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-slate-400">
-              Aucune question dans cette matière.
-            </p>
-          )}
-        </div>
 
-        <button
-          type="submit"
-          disabled={create.isPending}
-          className="rounded-lg bg-ems-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-        >
-          {create.isPending ? 'Création…' : 'Créer l’examen (brouillon)'}
-        </button>
-      </form>
+            {/* Composition */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Composition</Label>
+                <span className="text-xs text-muted-foreground">
+                  {selected.length} sélectionnée(s) — 15 à 20 pour publier
+                </span>
+              </div>
+              {!subjectId ? (
+                <p className="text-sm text-muted-foreground">
+                  Choisissez d'abord une matière.
+                </p>
+              ) : questions && questions.data.length > 0 ? (
+                <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                  {questions.data.map((q) => (
+                    <label
+                      key={q.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(q.id)}
+                        onChange={() => toggle(q.id)}
+                        className="size-4 accent-primary"
+                      />
+                      <span className="text-foreground">{q.statement}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Aucune question dans cette matière.
+                </p>
+              )}
+            </div>
+
+            <Button type="submit" loading={create.isPending}>
+              Créer l'examen (brouillon)
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       {actionError && (
-        <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
           {actionError}
         </div>
       )}
 
       {/* Liste */}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+      <Card className="overflow-hidden">
         {isPending ? (
-          <p className="p-6 text-sm text-slate-400">Chargement…</p>
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
+            ))}
+          </div>
         ) : isError ? (
-          <p className="p-6 text-sm text-red-600">Erreur de chargement.</p>
+          <p className="p-6 text-sm text-danger">Erreur de chargement.</p>
         ) : exams.data.length === 0 ? (
-          <p className="p-6 text-sm text-slate-400">Aucun examen.</p>
+          <p className="p-10 text-center text-sm text-muted-foreground">
+            Aucun examen.
+          </p>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-border">
             {exams.data.map((exam) => (
               <li
                 key={exam.id}
-                className="flex items-center justify-between gap-4 px-5 py-4"
+                className="flex items-center justify-between gap-4 px-4 py-4"
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-slate-800">{exam.title}</p>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        exam.isPublished
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-slate-100 text-slate-500'
-                      }`}
-                    >
+                    <p className="font-medium text-foreground">{exam.title}</p>
+                    <Badge variant={exam.isPublished ? 'success' : 'default'}>
                       {exam.isPublished ? 'Publié' : 'Brouillon'}
-                    </span>
+                    </Badge>
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {subjectName(exam.subjectId)} ·{' '}
-                    {exam._count?.examQuestions ?? 0} questions · {exam.durationMinutes}{' '}
-                    min · seuil {exam.passScore}%
+                    {exam._count?.examQuestions ?? 0} questions ·{' '}
+                    {exam.durationMinutes} min · seuil {exam.passScore}%
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-3 text-xs font-medium">
+                <div className="flex shrink-0 items-center gap-1">
                   {exam.isPublished ? (
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => unpublish.mutate(exam.id)}
-                      className="text-slate-600 hover:underline"
                     >
                       Dépublier
-                    </button>
+                    </Button>
                   ) : (
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-primary"
                       onClick={() => publish.mutate(exam.id)}
-                      className="text-ems-primary hover:underline"
                     >
                       Publier
-                    </button>
+                    </Button>
                   )}
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-danger"
                     onClick={() => del.mutate(exam.id)}
-                    className="text-red-600 hover:underline"
                   >
                     Supprimer
-                  </button>
+                  </Button>
                 </div>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

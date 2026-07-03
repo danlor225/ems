@@ -30,4 +30,10 @@ export const authApi = {
 
   logout: (refreshToken: string) =>
     api.post('/auth/logout', { refreshToken }),
+
+  updateProfile: (input: { firstName?: string; lastName?: string }) =>
+    api.patch<AuthUser>('/auth/me', input).then((r) => r.data),
+
+  changePassword: (input: { currentPassword: string; newPassword: string }) =>
+    api.patch('/auth/password', input),
 }

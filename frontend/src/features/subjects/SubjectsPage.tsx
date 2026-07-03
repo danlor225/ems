@@ -1,15 +1,24 @@
 // ============================================================
-//  SubjectsPage : CRUD des matières (patron de référence).
-//  - liste      : useQuery(['subjects'])
-//  - création   : useMutation + invalidation du cache
-//  - suppression: useMutation + gestion du 409 (matière utilisée)
+//  SubjectsPage — CRUD Matières (design system).
 // ============================================================
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
+import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { createSubject, deleteSubject, getSubjects } from './subjectsApi'
 
 const schema = z.object({
@@ -48,98 +57,101 @@ export function SubjectsPage() {
     mutationFn: (id: string) => deleteSubject(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subjects'] }),
     onError: (error) => {
-      if (axios.isAxiosError(error) && error.response?.status === 409) {
-        setActionError('Matière utilisée par des questions/examens : suppression impossible.')
-      } else {
-        setActionError('Erreur lors de la suppression.')
-      }
+      setActionError(
+        axios.isAxiosError(error) && error.response?.status === 409
+          ? 'Matière utilisée par des questions/examens : suppression impossible.'
+          : 'Erreur lors de la suppression.',
+      )
     },
   })
 
   return (
-    <div>
-      <h1 className="mb-6 text-xl font-bold text-slate-800">Matières</h1>
+    <div className="space-y-6">
+      <h1 className="text-xl font-bold tracking-tight text-foreground">
+        Matières
+      </h1>
 
-      {/* Formulaire de création */}
-      <form
-        onSubmit={handleSubmit((v) => create.mutate(v))}
-        className="mb-6 rounded-2xl bg-white p-5 shadow-sm"
-      >
-        <div className="flex flex-col gap-3 md:flex-row md:items-start">
-          <div className="flex-1">
-            <input
-              {...register('name')}
-              placeholder="Nom de la matière"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary"
-            />
-            {errors.name && (
-              <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
-            )}
-          </div>
-          <div className="flex-1">
-            <input
-              {...register('description')}
-              placeholder="Description (optionnelle)"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={create.isPending}
-            className="rounded-lg bg-ems-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      {/* Création */}
+      <Card>
+        <CardContent className="p-4">
+          <form
+            onSubmit={handleSubmit((v) => create.mutate(v))}
+            className="flex flex-col gap-3 md:flex-row md:items-start"
           >
-            {create.isPending ? 'Ajout…' : 'Ajouter'}
-          </button>
-        </div>
-      </form>
+            <div className="flex-1">
+              <Input placeholder="Nom de la matière" {...register('name')} />
+              {errors.name && (
+                <p className="mt-1 text-xs text-danger">{errors.name.message}</p>
+              )}
+            </div>
+            <Input
+              className="flex-1"
+              placeholder="Description (optionnelle)"
+              {...register('description')}
+            />
+            <Button type="submit" loading={create.isPending}>
+              <Plus className="size-4" />
+              Ajouter
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       {actionError && (
-        <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
           {actionError}
         </div>
       )}
 
       {/* Liste */}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+      <Card className="overflow-hidden">
         {isPending ? (
-          <p className="p-6 text-sm text-slate-400">Chargement…</p>
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-10 animate-pulse rounded-lg bg-muted" />
+            ))}
+          </div>
         ) : isError ? (
-          <p className="p-6 text-sm text-red-600">Erreur de chargement.</p>
+          <p className="p-6 text-sm text-danger">Erreur de chargement.</p>
         ) : data.data.length === 0 ? (
-          <p className="p-6 text-sm text-slate-400">Aucune matière.</p>
+          <p className="p-10 text-center text-sm text-muted-foreground">
+            Aucune matière pour le moment.
+          </p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-400">
-              <tr>
-                <th className="px-5 py-3 font-medium">Nom</th>
-                <th className="px-5 py-3 font-medium">Description</th>
-                <th className="px-5 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Nom</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {data.data.map((subject) => (
-                <tr key={subject.id}>
-                  <td className="px-5 py-3 font-medium text-slate-800">
+                <TableRow key={subject.id}>
+                  <TableCell className="font-medium text-foreground">
                     {subject.name}
-                  </td>
-                  <td className="px-5 py-3 text-slate-500">
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
                     {subject.description ?? '—'}
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <button
-                      type="button"
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Supprimer"
                       onClick={() => remove.mutate(subject.id)}
-                      className="text-xs font-medium text-red-600 hover:underline"
+                      className="text-muted-foreground hover:text-danger"
                     >
-                      Supprimer
-                    </button>
-                  </td>
-                </tr>
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

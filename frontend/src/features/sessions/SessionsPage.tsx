@@ -1,7 +1,5 @@
 // ============================================================
-//  SessionsPage : planification des sessions.
-//  - examen publié + fenêtre (datetime-local -> ISO UTC)
-//  - liste avec statut + Fermer / Supprimer
+//  SessionsPage — planification des sessions (design system).
 // ============================================================
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -9,6 +7,12 @@ import axios from 'axios'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { Badge, type BadgeProps } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
 import { getExams } from '../exams/examsApi'
 import {
   closeSession,
@@ -32,10 +36,10 @@ function axiosMessage(error: unknown, fallback: string): string {
   return fallback
 }
 
-const statusStyle: Record<string, string> = {
-  SCHEDULED: 'bg-blue-100 text-blue-700',
-  OPEN: 'bg-green-100 text-green-700',
-  CLOSED: 'bg-slate-100 text-slate-500',
+const statusVariant: Record<string, BadgeProps['variant']> = {
+  SCHEDULED: 'info',
+  OPEN: 'success',
+  CLOSED: 'default',
 }
 
 export function SessionsPage() {
@@ -61,7 +65,6 @@ export function SessionsPage() {
     mutationFn: (v: FormValues) =>
       createSession({
         examId: v.examId,
-        // datetime-local (heure locale) -> ISO UTC
         opensAt: new Date(v.opensAt).toISOString(),
         closesAt: new Date(v.closesAt).toISOString(),
       }),
@@ -72,7 +75,6 @@ export function SessionsPage() {
     },
     onError: (e) => setActionError(axiosMessage(e, 'Création impossible.')),
   })
-
   const close = useMutation({
     mutationFn: (id: string) => closeSession(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sessions'] }),
@@ -84,140 +86,147 @@ export function SessionsPage() {
   })
 
   return (
-    <div>
-      <h1 className="mb-6 text-xl font-bold text-slate-800">Sessions</h1>
+    <div className="space-y-6">
+      <h1 className="text-xl font-bold tracking-tight text-foreground">
+        Sessions
+      </h1>
 
-      {/* Formulaire */}
-      <form
-        onSubmit={handleSubmit((v) => create.mutate(v))}
-        className="mb-6 space-y-4 rounded-2xl bg-white p-5 shadow-sm"
-      >
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">
-            Examen (publié)
-          </label>
-          <select
-            {...register('examId')}
-            defaultValue=""
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary"
+      {/* Création */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Planifier une session</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={handleSubmit((v) => create.mutate(v))}
+            className="space-y-4"
           >
-            <option value="" disabled>
-              Choisir un examen…
-            </option>
-            {publishedExams.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.title}
-              </option>
-            ))}
-          </select>
-          {publishedExams.length === 0 && (
-            <p className="mt-1 text-xs text-slate-400">
-              Aucun examen publié. Publiez d’abord un examen.
-            </p>
-          )}
-          {errors.examId && (
-            <p className="mt-1 text-xs text-red-600">{errors.examId.message}</p>
-          )}
-        </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="examId">Examen (publié)</Label>
+              <NativeSelect
+                id="examId"
+                defaultValue=""
+                aria-invalid={!!errors.examId}
+                {...register('examId')}
+              >
+                <option value="" disabled>
+                  Choisir un examen…
+                </option>
+                {publishedExams.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.title}
+                  </option>
+                ))}
+              </NativeSelect>
+              {publishedExams.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Aucun examen publié. Publiez d'abord un examen.
+                </p>
+              )}
+              {errors.examId && (
+                <p className="text-xs text-danger">{errors.examId.message}</p>
+              )}
+            </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Ouverture
-            </label>
-            <input
-              type="datetime-local"
-              {...register('opensAt')}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary"
-            />
-            {errors.opensAt && (
-              <p className="mt-1 text-xs text-red-600">
-                {errors.opensAt.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Fermeture
-            </label>
-            <input
-              type="datetime-local"
-              {...register('closesAt')}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary"
-            />
-            {errors.closesAt && (
-              <p className="mt-1 text-xs text-red-600">
-                {errors.closesAt.message}
-              </p>
-            )}
-          </div>
-        </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="opensAt">Ouverture</Label>
+                <Input
+                  id="opensAt"
+                  type="datetime-local"
+                  aria-invalid={!!errors.opensAt}
+                  {...register('opensAt')}
+                />
+                {errors.opensAt && (
+                  <p className="text-xs text-danger">{errors.opensAt.message}</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="closesAt">Fermeture</Label>
+                <Input
+                  id="closesAt"
+                  type="datetime-local"
+                  aria-invalid={!!errors.closesAt}
+                  {...register('closesAt')}
+                />
+                {errors.closesAt && (
+                  <p className="text-xs text-danger">
+                    {errors.closesAt.message}
+                  </p>
+                )}
+              </div>
+            </div>
 
-        <button
-          type="submit"
-          disabled={create.isPending}
-          className="rounded-lg bg-ems-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-        >
-          {create.isPending ? 'Planification…' : 'Planifier la session'}
-        </button>
-      </form>
+            <Button type="submit" loading={create.isPending}>
+              Planifier la session
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       {actionError && (
-        <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
           {actionError}
         </div>
       )}
 
       {/* Liste */}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+      <Card className="overflow-hidden">
         {isPending ? (
-          <p className="p-6 text-sm text-slate-400">Chargement…</p>
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
+            ))}
+          </div>
         ) : isError ? (
-          <p className="p-6 text-sm text-red-600">Erreur de chargement.</p>
+          <p className="p-6 text-sm text-danger">Erreur de chargement.</p>
         ) : sessions.data.length === 0 ? (
-          <p className="p-6 text-sm text-slate-400">Aucune session.</p>
+          <p className="p-10 text-center text-sm text-muted-foreground">
+            Aucune session.
+          </p>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-border">
             {sessions.data.map((s) => (
               <li
                 key={s.id}
-                className="flex items-center justify-between gap-4 px-5 py-4"
+                className="flex items-center justify-between gap-4 px-4 py-4"
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-slate-800">{s.exam.title}</p>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusStyle[s.status]}`}
-                    >
-                      {s.status}
-                    </span>
+                    <p className="font-medium text-foreground">
+                      {s.exam.title}
+                    </p>
+                    <Badge variant={statusVariant[s.status]}>{s.status}</Badge>
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Du {new Date(s.opensAt).toLocaleString('fr-FR')} au{' '}
                     {new Date(s.closesAt).toLocaleString('fr-FR')}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-3 text-xs font-medium">
+                <div className="flex shrink-0 items-center gap-1">
                   {s.status !== 'CLOSED' && (
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => close.mutate(s.id)}
-                      className="text-slate-600 hover:underline"
                     >
                       Fermer
-                    </button>
+                    </Button>
                   )}
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-danger"
                     onClick={() => del.mutate(s.id)}
-                    className="text-red-600 hover:underline"
                   >
                     Supprimer
-                  </button>
+                  </Button>
                 </div>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

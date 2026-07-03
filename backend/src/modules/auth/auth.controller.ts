@@ -9,6 +9,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -20,9 +21,11 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuthService } from './auth.service';
 import type { SafeUser } from './auth.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Controller('auth') // préfixe des routes : /api/auth/...
 export class AuthController {
@@ -64,6 +67,27 @@ export class AuthController {
   me(@CurrentUser() user: SafeUser) {
     // À ce stade, la JwtStrategy a déjà validé le token et chargé l'utilisateur.
     return user;
+  }
+
+  // PATCH /api/auth/me — met à jour le profil (prénom / nom).
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  updateProfile(
+    @CurrentUser() user: SafeUser,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(user.id, dto);
+  }
+
+  // PATCH /api/auth/password — change le mot de passe.
+  @UseGuards(JwtAuthGuard)
+  @Patch('password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  changePassword(
+    @CurrentUser() user: SafeUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(user.id, dto);
   }
 
   // GET /api/auth/admin-only — DÉMONSTRATION RBAC.

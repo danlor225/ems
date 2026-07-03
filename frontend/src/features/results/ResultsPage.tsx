@@ -1,12 +1,27 @@
 // ============================================================
-//  ResultsPage : consultation des résultats (staff).
-//  - tableau filtrable (examen, statut)
-//  - clic sur une ligne -> modale de correction détaillée
+//  ResultsPage — consultation des résultats (design system).
+//  Tableau filtrable + modale de correction animée.
 // ============================================================
 import { useQuery } from '@tanstack/react-query'
+import { AnimatePresence, motion } from 'framer-motion'
+import { X } from 'lucide-react'
 import { useState } from 'react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { NativeSelect } from '@/components/ui/native-select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { getExams } from '../exams/examsApi'
 import { getResultDetail, getResults } from './resultsApi'
+
+const EASE = [0.16, 1, 0.3, 1] as const
 
 function ResultDetailModal({
   attemptId,
@@ -22,37 +37,49 @@ function ResultDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={onClose}
     >
-      <div
-        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 8 }}
+        transition={{ duration: 0.2, ease: EASE }}
+        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-floating"
         onClick={(e) => e.stopPropagation()}
       >
         {isPending ? (
-          <p className="text-sm text-slate-400">Chargement…</p>
+          <p className="text-sm text-muted-foreground">Chargement…</p>
         ) : isError || !data ? (
-          <p className="text-sm text-red-600">Erreur de chargement.</p>
+          <p className="text-sm text-danger">Erreur de chargement.</p>
         ) : (
           <>
             <div className="mb-4 flex items-start justify-between">
               <div>
-                <h2 className="font-semibold text-slate-800">
+                <h2 className="font-semibold text-foreground">
                   {data.student.firstName} {data.student.lastName}
                 </h2>
-                <p className="text-xs text-slate-400">{data.exam.title}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-ems-primary">
-                  {data.attempt.score}%
+                <p className="text-xs text-muted-foreground">
+                  {data.exam.title}
                 </p>
-                <span
-                  className={`text-xs font-semibold ${
-                    data.passed ? 'text-green-600' : 'text-red-600'
-                  }`}
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-primary">
+                    {data.attempt.score}%
+                  </p>
+                  <Badge variant={data.passed ? 'success' : 'danger'}>
+                    {data.passed ? 'Réussi' : 'Échoué'}
+                  </Badge>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Fermer"
+                  onClick={onClose}
                 >
-                  {data.passed ? 'Réussi' : 'Échoué'}
-                </span>
+                  <X className="size-4" />
+                </Button>
               </div>
             </div>
 
@@ -60,19 +87,19 @@ function ResultDetailModal({
               {data.correction.map((item, qi) => (
                 <div
                   key={item.questionId}
-                  className="rounded-lg border border-slate-100 p-3"
+                  className="rounded-lg border border-border p-3"
                 >
-                  <p className="mb-2 text-sm font-medium text-slate-800">
+                  <p className="mb-2 text-sm font-medium text-foreground">
                     {qi + 1}. {item.statement}
                   </p>
                   <div className="space-y-1">
                     {item.options.map((opt) => {
                       const isSelected = item.selectedOptionId === opt.id
                       const style = opt.isCorrect
-                        ? 'text-green-700'
+                        ? 'text-success'
                         : isSelected
-                          ? 'text-red-700'
-                          : 'text-slate-500'
+                          ? 'text-danger'
+                          : 'text-muted-foreground'
                       return (
                         <div key={opt.id} className={`text-sm ${style}`}>
                           {opt.isCorrect ? '✓ ' : isSelected ? '✗ ' : '• '}
@@ -84,16 +111,9 @@ function ResultDetailModal({
                 </div>
               ))}
             </div>
-
-            <button
-              onClick={onClose}
-              className="mt-5 w-full rounded-lg bg-ems-primary py-2 text-sm font-semibold text-white"
-            >
-              Fermer
-            </button>
           </>
         )}
-      </div>
+      </motion.div>
     </div>
   )
 }
@@ -104,7 +124,6 @@ export function ResultsPage() {
   const [selected, setSelected] = useState<string | null>(null)
 
   const { data: exams } = useQuery({ queryKey: ['exams'], queryFn: () => getExams() })
-
   const { data, isPending, isError } = useQuery({
     queryKey: ['results', examId, status],
     queryFn: () =>
@@ -112,15 +131,17 @@ export function ResultsPage() {
   })
 
   return (
-    <div>
-      <h1 className="mb-6 text-xl font-bold text-slate-800">Résultats</h1>
+    <div className="space-y-6">
+      <h1 className="text-xl font-bold tracking-tight text-foreground">
+        Résultats
+      </h1>
 
       {/* Filtres */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <select
+      <div className="flex flex-wrap items-center gap-2">
+        <NativeSelect
           value={examId}
           onChange={(e) => setExamId(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-ems-primary"
+          className="h-9 w-auto"
         >
           <option value="">Tous les examens</option>
           {exams?.data.map((e) => (
@@ -128,78 +149,82 @@ export function ResultsPage() {
               {e.title}
             </option>
           ))}
-        </select>
-        <select
+        </NativeSelect>
+        <NativeSelect
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-ems-primary"
+          className="h-9 w-auto"
         >
           <option value="">Tous les statuts</option>
           <option value="SUBMITTED">Soumis</option>
           <option value="EXPIRED">Expiré</option>
-        </select>
+        </NativeSelect>
       </div>
 
       {/* Tableau */}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+      <Card className="overflow-hidden">
         {isPending ? (
-          <p className="p-6 text-sm text-slate-400">Chargement…</p>
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-10 animate-pulse rounded-lg bg-muted" />
+            ))}
+          </div>
         ) : isError ? (
-          <p className="p-6 text-sm text-red-600">Erreur de chargement.</p>
+          <p className="p-6 text-sm text-danger">Erreur de chargement.</p>
         ) : data.data.length === 0 ? (
-          <p className="p-6 text-sm text-slate-400">Aucun résultat.</p>
+          <p className="p-10 text-center text-sm text-muted-foreground">
+            Aucun résultat.
+          </p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-400">
-              <tr>
-                <th className="px-5 py-3 font-medium">Étudiant</th>
-                <th className="px-5 py-3 font-medium">Examen</th>
-                <th className="px-5 py-3 font-medium">Score</th>
-                <th className="px-5 py-3 font-medium">Résultat</th>
-                <th className="px-5 py-3 font-medium">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Étudiant</TableHead>
+                <TableHead>Examen</TableHead>
+                <TableHead>Score</TableHead>
+                <TableHead>Résultat</TableHead>
+                <TableHead>Date</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {data.data.map((row) => (
-                <tr
+                <TableRow
                   key={row.attemptId}
                   onClick={() => setSelected(row.attemptId)}
-                  className="cursor-pointer hover:bg-slate-50"
+                  className="cursor-pointer"
                 >
-                  <td className="px-5 py-3 font-medium text-slate-800">
+                  <TableCell className="font-medium text-foreground">
                     {row.student.firstName} {row.student.lastName}
-                  </td>
-                  <td className="px-5 py-3 text-slate-500">{row.examTitle}</td>
-                  <td className="px-5 py-3 text-slate-800">{row.score}%</td>
-                  <td className="px-5 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        row.passed
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {row.examTitle}
+                  </TableCell>
+                  <TableCell className="text-foreground">{row.score}%</TableCell>
+                  <TableCell>
+                    <Badge variant={row.passed ? 'success' : 'danger'}>
                       {row.passed ? 'Réussi' : 'Échoué'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-slate-400">
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
                     {row.submittedAt
                       ? new Date(row.submittedAt).toLocaleString('fr-FR')
                       : '—'}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
-      </div>
+      </Card>
 
-      {selected && (
-        <ResultDetailModal
-          attemptId={selected}
-          onClose={() => setSelected(null)}
-        />
-      )}
+      <AnimatePresence>
+        {selected && (
+          <ResultDetailModal
+            attemptId={selected}
+            onClose={() => setSelected(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -16,8 +16,10 @@ import { Prisma, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomUUID } from 'node:crypto';
 import { UsersService } from '../users/users.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { RefreshTokenService } from './refresh-token.service';
 
@@ -134,6 +136,38 @@ export class AuthService {
     } catch {
       // Un token déjà invalide/expiré ne provoque pas d'erreur : logout idempotent.
     }
+  }
+
+  /** Met à jour le profil (prénom / nom) et renvoie l'utilisateur "safe". */
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+  ): Promise<SafeUser> {
+    const user = await this.usersService.updateProfile(userId, {
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+    });
+    return this.toSafeUser(user);
+  }
+
+  /** Change le mot de passe après vérification de l'actuel. */
+  async changePassword(
+    userId: string,
+    dto: ChangePasswordDto,
+  ): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const matches = await bcrypt.compare(
+      dto.currentPassword,
+      user.passwordHash,
+    );
+    if (!matches) {
+      throw new UnauthorizedException('Mot de passe actuel incorrect.');
+    }
+    const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS);
+    await this.usersService.updatePassword(userId, passwordHash);
   }
 
   // ------------------------------------------------------------

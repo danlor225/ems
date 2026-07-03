@@ -1,70 +1,126 @@
+import { Loader2 } from 'lucide-react'
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { AppLayout } from './components/AppLayout'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import { LoginPage } from './features/auth/LoginPage'
-import { RegisterPage } from './features/auth/RegisterPage'
-import { ExamPage } from './features/exam/ExamPage'
-import { ResultPage } from './features/exam/ResultPage'
-import { ExamsPage } from './features/exams/ExamsPage'
-import { QuestionsPage } from './features/questions/QuestionsPage'
-import { ResultsPage } from './features/results/ResultsPage'
-import { SessionsPage } from './features/sessions/SessionsPage'
-import { SubjectsPage } from './features/subjects/SubjectsPage'
-import { DashboardPage } from './pages/DashboardPage'
+
+// ------------------------------------------------------------
+//  Chargement paresseux (code-splitting) : chaque page est un
+//  chunk séparé, chargé au moment où sa route est visitée.
+//  Les exports sont nommés -> on les remappe en "default".
+// ------------------------------------------------------------
+const AppLayout = lazy(() =>
+  import('./components/AppLayout').then((m) => ({ default: m.AppLayout })),
+)
+const LoginPage = lazy(() =>
+  import('./features/auth/LoginPage').then((m) => ({ default: m.LoginPage })),
+)
+const RegisterPage = lazy(() =>
+  import('./features/auth/RegisterPage').then((m) => ({
+    default: m.RegisterPage,
+  })),
+)
+const DashboardPage = lazy(() =>
+  import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+)
+const SettingsPage = lazy(() =>
+  import('./features/settings/SettingsPage').then((m) => ({
+    default: m.SettingsPage,
+  })),
+)
+const SubjectsPage = lazy(() =>
+  import('./features/subjects/SubjectsPage').then((m) => ({
+    default: m.SubjectsPage,
+  })),
+)
+const QuestionsPage = lazy(() =>
+  import('./features/questions/QuestionsPage').then((m) => ({
+    default: m.QuestionsPage,
+  })),
+)
+const ExamsPage = lazy(() =>
+  import('./features/exams/ExamsPage').then((m) => ({ default: m.ExamsPage })),
+)
+const SessionsPage = lazy(() =>
+  import('./features/sessions/SessionsPage').then((m) => ({
+    default: m.SessionsPage,
+  })),
+)
+const ResultsPage = lazy(() =>
+  import('./features/results/ResultsPage').then((m) => ({
+    default: m.ResultsPage,
+  })),
+)
+const ExamPage = lazy(() =>
+  import('./features/exam/ExamPage').then((m) => ({ default: m.ExamPage })),
+)
+const StudentResultPage = lazy(() =>
+  import('./features/exam/ResultPage').then((m) => ({ default: m.ResultPage })),
+)
+
+function PageLoader() {
+  return (
+    <div className="grid min-h-screen place-items-center text-muted-foreground">
+      <Loader2 className="size-6 animate-spin" />
+    </div>
+  )
+}
 
 export default function App() {
   return (
-    <Routes>
-      {/* Routes publiques */}
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        {/* Routes publiques */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
 
-      {/* Coquille authentifiée (tous rôles) : layout + accueil */}
-      <Route
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/" element={<DashboardPage />} />
-      </Route>
+        {/* Coquille authentifiée (tous rôles) */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/parametres" element={<SettingsPage />} />
+        </Route>
 
-      {/* Coquille admin (TEACHER/ADMIN) : mêmes layout, routes /admin/* */}
-      <Route
-        element={
-          <ProtectedRoute roles={['TEACHER', 'ADMIN']}>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/admin/matieres" element={<SubjectsPage />} />
-        <Route path="/admin/questions" element={<QuestionsPage />} />
-        <Route path="/admin/examens" element={<ExamsPage />} />
-        <Route path="/admin/sessions" element={<SessionsPage />} />
-        <Route path="/admin/resultats" element={<ResultsPage />} />
-      </Route>
+        {/* Coquille admin (TEACHER/ADMIN) */}
+        <Route
+          element={
+            <ProtectedRoute roles={['TEACHER', 'ADMIN']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/admin/matieres" element={<SubjectsPage />} />
+          <Route path="/admin/questions" element={<QuestionsPage />} />
+          <Route path="/admin/examens" element={<ExamsPage />} />
+          <Route path="/admin/sessions" element={<SessionsPage />} />
+          <Route path="/admin/resultats" element={<ResultsPage />} />
+        </Route>
 
-      {/* Passage d'évaluation (étudiant), plein écran */}
-      <Route
-        path="/evaluations/:sessionId"
-        element={
-          <ProtectedRoute roles={['STUDENT']}>
-            <ExamPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/resultats/:attemptId"
-        element={
-          <ProtectedRoute roles={['STUDENT']}>
-            <ResultPage />
-          </ProtectedRoute>
-        }
-      />
+        {/* Passage d'évaluation (étudiant), plein écran */}
+        <Route
+          path="/evaluations/:sessionId"
+          element={
+            <ProtectedRoute roles={['STUDENT']}>
+              <ExamPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/resultats/:attemptId"
+          element={
+            <ProtectedRoute roles={['STUDENT']}>
+              <StudentResultPage />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* URL inconnue -> accueil */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* URL inconnue -> accueil */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }

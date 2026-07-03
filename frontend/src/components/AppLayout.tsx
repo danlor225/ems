@@ -16,6 +16,7 @@ import {
   LogOut,
   type LucideIcon,
   Menu,
+  Settings,
 } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
@@ -38,10 +39,12 @@ const STAFF_NAV: NavItem[] = [
   { label: 'Examens', to: '/admin/examens', icon: FileText },
   { label: 'Sessions', to: '/admin/sessions', icon: CalendarClock },
   { label: 'Résultats', to: '/admin/resultats', icon: BarChart3 },
+  { label: 'Paramètres', to: '/parametres', icon: Settings },
 ]
 const STUDENT_NAV: NavItem[] = [
   { label: 'Accueil', to: '/', icon: Home },
   { label: 'Mes résultats', to: '/', icon: Award },
+  { label: 'Paramètres', to: '/parametres', icon: Settings },
 ]
 
 function SidebarContent({
