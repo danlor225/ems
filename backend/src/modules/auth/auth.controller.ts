@@ -12,6 +12,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -27,14 +28,16 @@ import { RegisterDto } from './dto/register.dto';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  // POST /api/auth/register
+  // POST /api/auth/register — limite stricte : 5 tentatives / minute / IP.
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('register')
   @HttpCode(HttpStatus.CREATED) // 201 : une ressource (utilisateur) a été créée
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
-  // POST /api/auth/login
+  // POST /api/auth/login — limite stricte anti-brute-force : 5 / minute / IP.
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK) // 200 : pas de création de ressource, juste une vérification
   login(@Body() dto: LoginDto) {

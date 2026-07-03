@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -22,6 +24,9 @@ import { validateEnv } from './config/env.validation';
       envFilePath: '../.env', // le .env est à la racine ; le backend démarre depuis backend/
       validate: validateEnv, // rejette le démarrage si une variable manque/est invalide
     }),
+    // ThrottlerModule : limite générale de 100 requêtes / minute / IP.
+    // (stockage en mémoire ; en multi-instances on utiliserait Redis)
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     // PrismaModule : accès à la base de données, disponible globalement.
     PrismaModule,
     // AuthModule : inscription / connexion (routes /api/auth/...).
@@ -44,6 +49,10 @@ import { validateEnv } from './config/env.validation';
     ActivityLogModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    // Guard global : applique le rate limiting à TOUTES les routes.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}
