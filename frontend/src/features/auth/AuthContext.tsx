@@ -12,13 +12,14 @@ import {
   type ReactNode,
 } from 'react'
 import { tokenStore } from '../../lib/tokenStore'
-import { authApi } from './authApi'
+import { authApi, type RegisterInput } from './authApi'
 import type { AuthUser } from './types'
 
 interface AuthContextValue {
   user: AuthUser | null
   isBootstrapping: boolean
   login: (email: string, password: string) => Promise<AuthUser>
+  register: (input: RegisterInput) => Promise<AuthUser>
   logout: () => Promise<void>
 }
 
@@ -60,6 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.user
   }
 
+  // Inscription puis connexion automatique.
+  async function register(input: RegisterInput) {
+    await authApi.register(input)
+    return login(input.email, input.password)
+  }
+
   async function logout() {
     const refreshToken = tokenStore.getRefreshToken()
     if (refreshToken) {
@@ -72,7 +79,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isBootstrapping, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, isBootstrapping, login, register, logout }}
+    >
       {children}
     </AuthContext.Provider>
   )

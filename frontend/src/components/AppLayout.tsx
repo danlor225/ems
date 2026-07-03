@@ -1,19 +1,30 @@
 // ============================================================
 //  AppLayout : ossature de l'application (barre latérale + en-tête).
-//  La navigation s'adapte au rôle. Seul le "Tableau de bord" est
-//  actif en Phase 7.3 ; les autres entrées sont des repères visuels
-//  qui seront reliés à leurs pages dans les phases suivantes.
+//  Route de mise en page : le contenu s'affiche dans <Outlet/>.
+//  La navigation s'adapte au rôle et utilise NavLink (lien actif).
 // ============================================================
-import type { ReactNode } from 'react'
+import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
 
-export function AppLayout({ children }: { children: ReactNode }) {
+interface NavItem {
+  label: string
+  to: string
+}
+
+export function AppLayout() {
   const { user, logout } = useAuth()
   const isStaff = user?.role === 'TEACHER' || user?.role === 'ADMIN'
 
-  const navItems = isStaff
-    ? ['Tableau de bord', 'Évaluations', 'Résultats', 'Utilisateurs', 'Paramètres']
-    : ['Accueil', 'Mes évaluations', 'Mes résultats']
+  const navItems: NavItem[] = isStaff
+    ? [
+        { label: 'Tableau de bord', to: '/' },
+        { label: 'Matières', to: '/admin/matieres' },
+        { label: 'Questions', to: '/admin/questions' },
+        { label: 'Examens', to: '/admin/examens' },
+        { label: 'Sessions', to: '/admin/sessions' },
+        { label: 'Résultats', to: '/admin/resultats' },
+      ]
+    : [{ label: 'Accueil', to: '/' }]
 
   return (
     <div className="flex min-h-screen">
@@ -23,17 +34,21 @@ export function AppLayout({ children }: { children: ReactNode }) {
           EM<span className="text-ems-sky">S</span>
         </div>
         <nav className="mt-2 flex-1 space-y-1 px-3">
-          {navItems.map((item, index) => (
-            <div
-              key={item}
-              className={
-                index === 0
-                  ? 'rounded-lg bg-white/15 px-3 py-2 text-sm font-medium'
-                  : 'cursor-default rounded-lg px-3 py-2 text-sm text-white/60'
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
+              className={({ isActive }) =>
+                `block rounded-lg px-3 py-2 text-sm transition ${
+                  isActive
+                    ? 'bg-white/15 font-medium text-white'
+                    : 'text-white/60 hover:bg-white/10 hover:text-white'
+                }`
               }
             >
-              {item}
-            </div>
+              {item.label}
+            </NavLink>
           ))}
         </nav>
         <button
@@ -55,7 +70,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <p className="text-xs text-slate-400">{user?.role}</p>
           </div>
         </header>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-6">
+          <Outlet />
+        </main>
       </div>
     </div>
   )

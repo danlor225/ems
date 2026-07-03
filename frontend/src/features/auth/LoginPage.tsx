@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { loginSchema, type LoginFormValues } from './loginSchema'
 
@@ -103,6 +103,16 @@ export function LoginPage() {
             {isSubmitting ? 'Connexion…' : 'Se connecter'}
           </button>
         </form>
+
+        <p className="mt-4 text-center text-sm text-slate-500">
+          Pas encore de compte ?{' '}
+          <Link
+            to="/register"
+            className="font-medium text-ems-primary hover:underline"
+          >
+            S’inscrire
+          </Link>
+        </p>
       </div>
     </div>
   )
