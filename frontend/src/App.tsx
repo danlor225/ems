@@ -40,6 +40,11 @@ const QuestionsPage = lazy(() =>
 const ExamsPage = lazy(() =>
   import('./features/exams/ExamsPage').then((m) => ({ default: m.ExamsPage })),
 )
+const CreateExamWizard = lazy(() =>
+  import('./features/exams/CreateExamWizard').then((m) => ({
+    default: m.CreateExamWizard,
+  })),
+)
 const SessionsPage = lazy(() =>
   import('./features/sessions/SessionsPage').then((m) => ({
     default: m.SessionsPage,
@@ -96,6 +101,10 @@ export default function App() {
           <Route path="/admin/matieres" element={<SubjectsPage />} />
           <Route path="/admin/questions" element={<QuestionsPage />} />
           <Route path="/admin/examens" element={<ExamsPage />} />
+          <Route
+            path="/admin/examens/nouveau"
+            element={<CreateExamWizard />}
+          />
           <Route path="/admin/sessions" element={<SessionsPage />} />
           <Route path="/admin/resultats" element={<ResultsPage />} />
         </Route>
