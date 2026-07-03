@@ -1,18 +1,27 @@
 // ============================================================
-//  LoginPage : formulaire de connexion (React Hook Form + Zod).
+//  LoginPage — refonte premium sur AuthLayout.
 // ============================================================
 import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Eye, EyeOff, Lock, Mail } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { AuthLayout } from './AuthLayout'
 import { useAuth } from './AuthContext'
 import { loginSchema, type LoginFormValues } from './loginSchema'
+
+const EASE = [0.16, 1, 0.3, 1] as const
 
 export function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
   const [serverError, setServerError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
 
   const {
     register,
@@ -35,85 +44,114 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
-        <div className="mb-6 text-center">
-          <div className="text-3xl font-extrabold tracking-tight text-ems-primary">
-            EM<span className="text-ems-dark">S</span>
-          </div>
-          <p className="mt-1 text-sm text-slate-500">
-            Connectez-vous à votre compte
-          </p>
-        </div>
+    <AuthLayout>
+      <h2 className="text-2xl font-bold tracking-tight text-foreground">
+        Bon retour 👋
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Connectez-vous pour accéder à votre espace.
+      </p>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          <div>
-            <label
-              htmlFor="email"
-              className="mb-1 block text-sm font-medium text-slate-700"
-            >
-              Email
-            </label>
-            <input
+      <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-5" noValidate>
+        {/* Email */}
+        <div className="space-y-1.5">
+          <Label htmlFor="email">Email</Label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
               id="email"
               type="email"
               autoComplete="email"
-              {...register('email')}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary focus:ring-2 focus:ring-ems-primary/20"
               placeholder="vous@exemple.com"
+              className="pl-9"
+              aria-invalid={!!errors.email}
+              aria-describedby={errors.email ? 'email-error' : undefined}
+              {...register('email')}
             />
-            {errors.email && (
-              <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>
-            )}
           </div>
-
-          <div>
-            <label
-              htmlFor="password"
-              className="mb-1 block text-sm font-medium text-slate-700"
-            >
-              Mot de passe
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              {...register('password')}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-ems-primary focus:ring-2 focus:ring-ems-primary/20"
-              placeholder="••••••••"
-            />
-            {errors.password && (
-              <p className="mt-1 text-xs text-red-600">
-                {errors.password.message}
-              </p>
-            )}
-          </div>
-
-          {serverError && (
-            <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-              {serverError}
-            </div>
+          {errors.email && (
+            <p id="email-error" className="text-xs text-danger">
+              {errors.email.message}
+            </p>
           )}
+        </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full rounded-lg bg-ems-primary py-2.5 text-sm font-semibold text-white transition hover:bg-ems-dark disabled:opacity-60"
-          >
-            {isSubmitting ? 'Connexion…' : 'Se connecter'}
-          </button>
-        </form>
+        {/* Mot de passe */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Mot de passe</Label>
+            <Link
+              to="/mot-de-passe-oublie"
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Oublié ?
+            </Link>
+          </div>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              placeholder="••••••••"
+              className="pl-9 pr-10"
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? 'password-error' : undefined}
+              {...register('password')}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={
+                showPassword
+                  ? 'Masquer le mot de passe'
+                  : 'Afficher le mot de passe'
+              }
+              className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {showPassword ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
+            </button>
+          </div>
+          {errors.password && (
+            <p id="password-error" className="text-xs text-danger">
+              {errors.password.message}
+            </p>
+          )}
+        </div>
 
-        <p className="mt-4 text-center text-sm text-slate-500">
-          Pas encore de compte ?{' '}
-          <Link
-            to="/register"
-            className="font-medium text-ems-primary hover:underline"
-          >
-            S’inscrire
-          </Link>
-        </p>
-      </div>
-    </div>
+        {/* Erreur serveur (animée) */}
+        <AnimatePresence initial={false}>
+          {serverError && (
+            <motion.div
+              role="alert"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2, ease: EASE }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+                {serverError}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <Button type="submit" loading={isSubmitting} className="w-full">
+          {isSubmitting ? 'Connexion…' : 'Se connecter'}
+        </Button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        Pas encore de compte ?{' '}
+        <Link to="/register" className="font-medium text-primary hover:underline">
+          S'inscrire
+        </Link>
+      </p>
+    </AuthLayout>
   )
 }

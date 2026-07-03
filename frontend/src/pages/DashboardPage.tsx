@@ -13,7 +13,7 @@ export function DashboardPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold text-slate-800">
+      <h1 className="mb-6 text-xl font-bold text-foreground">
         Bonjour {user?.firstName} 👋
       </h1>
       {isStaff ? <DashboardStats /> : <StudentHome />}
