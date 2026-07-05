@@ -20,7 +20,14 @@ import {
 } from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { NativeSelect } from '@/components/ui/native-select'
+import { exportCsv, exportExcel, exportPdf } from './exportResults'
 import { StatCard } from '@/components/ui/stat-card'
 import {
   Table,
@@ -37,7 +44,13 @@ import {
   getResultDetail,
   type ResultStatus,
 } from './resultsApi'
-import { Award, CheckCircle2, TrendingUp, Users } from 'lucide-react'
+import {
+  Award,
+  CheckCircle2,
+  Download,
+  TrendingUp,
+  Users,
+} from 'lucide-react'
 
 const STATUS_CLS: Record<ResultStatus, string> = {
   'Très Bien': 'bg-success/15 text-success',
@@ -151,25 +164,56 @@ export function ResultsPage() {
       ]
     : []
 
+  const selectedEval = evaluations?.data.find((e) => e.id === evaluationId)
+  const canExport = !!data && data.students.length > 0
+  const exportMeta = {
+    code: selectedEval?.code,
+    subject: selectedEval?.subject,
+    academicSession: selectedEval?.academicSession,
+    author: selectedEval?.author,
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-bold tracking-tight text-foreground">
           Résultats
         </h1>
-        <NativeSelect
-          value={evaluationId}
-          onChange={(e) => setEvaluationId(e.target.value)}
-          className="sm:w-72"
-        >
-          <option value="">Choisir une évaluation…</option>
-          {evaluations?.data.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.code ? `${e.code} · ` : ''}
-              {e.name}
-            </option>
-          ))}
-        </NativeSelect>
+        <div className="flex items-center gap-2">
+          <NativeSelect
+            value={evaluationId}
+            onChange={(e) => setEvaluationId(e.target.value)}
+            className="sm:w-72"
+          >
+            <option value="">Choisir une évaluation…</option>
+            {evaluations?.data.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.code ? `${e.code} · ` : ''}
+                {e.name}
+              </option>
+            ))}
+          </NativeSelect>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={!canExport}>
+                <Download className="size-4" />
+                Exporter
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onSelect={() => data && void exportPdf(data, exportMeta)}>
+                PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => data && void exportExcel(data, exportMeta)}>
+                Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => data && exportCsv(data, exportMeta)}>
+                CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {!evaluationId ? (
