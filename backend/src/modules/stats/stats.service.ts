@@ -27,43 +27,49 @@ export class StatsService {
         this.prisma.question.count(),
       ]);
 
-    // 2) Score moyen (agrégation).
-    const avg = await this.prisma.attempt.aggregate({
-      where: finished,
-      _avg: { score: true },
-    });
-
-    // 3) Répartition des notes (comptages par plage).
-    const [excellent, bien, moyen, faible] = await this.prisma.$transaction([
-      this.prisma.attempt.count({ where: { ...finished, score: { gte: 90 } } }),
-      this.prisma.attempt.count({
-        where: { ...finished, score: { gte: 70, lt: 90 } },
-      }),
-      this.prisma.attempt.count({
-        where: { ...finished, score: { gte: 50, lt: 70 } },
-      }),
-      this.prisma.attempt.count({ where: { ...finished, score: { lt: 50 } } }),
-    ]);
-
-    // 4) Taux de réussite : compare score au passScore de CHAQUE examen.
-    //    Comparaison entre colonnes => SQL brut (paramétré, sûr).
+    // La note est en POINTS bruts ; on dérive un pourcentage par tentative
+    // (note / total des points de l'évaluation) pour agréger un tableau de bord
+    // comparable entre évaluations de barèmes différents.
     const rows = await this.prisma.$queryRaw<
-      Array<{ total: number; passed: number }>
+      Array<{ pct: number; pass_score: number }>
     >`
-      SELECT COUNT(*)::int AS total,
-             COUNT(*) FILTER (WHERE a.score >= e.pass_score)::int AS passed
+      SELECT
+        CASE WHEN tp.total > 0 THEN (a.score / tp.total) * 100 ELSE 0 END AS pct,
+        e.pass_score AS pass_score
       FROM attempts a
       JOIN sessions s ON s.id = a.session_id
       JOIN exams e ON e.id = s.exam_id
+      JOIN LATERAL (
+        SELECT COALESCE(SUM(q.points), 0) AS total
+        FROM exam_questions eq
+        JOIN questions q ON q.id = eq.question_id
+        WHERE eq.exam_id = e.id
+      ) tp ON true
       WHERE a.status::text IN ('SUBMITTED', 'EXPIRED')`;
-    const { total, passed } = rows[0];
-    const successRate = total > 0 ? this.round2((passed / total) * 100) : 0;
+
+    const n = rows.length;
+    const pcts = rows.map((r) => Number(r.pct));
+    const averageScore = n
+      ? this.round2(pcts.reduce((s, p) => s + p, 0) / n)
+      : 0;
+    const passed = rows.filter(
+      (r) => Number(r.pct) >= Number(r.pass_score),
+    ).length;
+    const successRate = n ? this.round2((passed / n) * 100) : 0;
+
+    const distribution = { excellent: 0, bien: 0, moyen: 0, faible: 0 };
+    for (const p of pcts) {
+      if (p >= 90) distribution.excellent++;
+      else if (p >= 70) distribution.bien++;
+      else if (p >= 50) distribution.moyen++;
+      else distribution.faible++;
+    }
 
     return {
       counts: { exams, sessions, students, attempts, questions },
-      averageScore: avg._avg.score !== null ? this.round2(avg._avg.score) : 0,
+      averageScore,
       successRate,
-      distribution: { excellent, bien, moyen, faible },
+      distribution,
     };
   }
 

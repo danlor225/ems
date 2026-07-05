@@ -70,7 +70,11 @@ export function ResultPage() {
                 Merci, votre évaluation est terminée.
               </p>
               <p className="mt-1 text-5xl font-extrabold tracking-tight text-primary">
-                {data.attempt.score}%
+                {data.attempt.score}
+                <span className="text-2xl text-muted-foreground">
+                  {' '}
+                  / {data.exam.totalPoints}
+                </span>
               </p>
               <Badge
                 variant={data.passed ? 'success' : 'danger'}

@@ -27,6 +27,12 @@ export class ResultsController {
     return this.resultsService.findAll(query);
   }
 
+  // Déclarée AVANT ':id' pour ne pas être capturée par le paramètre.
+  @Get('evaluation/:id')
+  byEvaluation(@Param('id', ParseUUIDPipe) id: string) {
+    return this.resultsService.getByEvaluation(id);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.resultsService.findOne(id);

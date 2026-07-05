@@ -185,10 +185,8 @@ export class AttemptsService {
     const pointsByQuestion = new Map(questions.map((q) => [q.id, q.points]));
 
     let earned = 0;
-    let total = 0;
     for (const answer of attempt.answers) {
       const points = pointsByQuestion.get(answer.questionId) ?? 0;
-      total += points;
       if (
         answer.selectedOptionId &&
         answer.selectedOptionId === correctOptionByQuestion.get(answer.questionId)
@@ -196,8 +194,8 @@ export class AttemptsService {
         earned += points;
       }
     }
-    // Note en pourcentage, arrondie à 2 décimales.
-    const score = total > 0 ? Math.round((earned / total) * 10_000) / 100 : 0;
+    // Note = SOMME des points obtenus (barème en points bruts, pas en %).
+    const score = earned;
 
     // Si le temps est écoulé, on fige en EXPIRED (mais on note quand même).
     const status = Date.now() >= attempt.expiresAt.getTime() ? 'EXPIRED' : 'SUBMITTED';
@@ -299,11 +297,16 @@ export class AttemptsService {
     });
 
     const passScore = attempt.session.exam.passScore;
+    const totalPoints = questions.reduce((sum, q) => sum + q.points, 0);
+    const percentage =
+      attempt.score !== null && totalPoints > 0
+        ? (attempt.score / totalPoints) * 100
+        : 0;
     return {
       attempt: {
         id: attempt.id,
         status: attempt.status,
-        score: attempt.score,
+        score: attempt.score, // note = somme des points
         submittedAt: attempt.submittedAt,
       },
       student: attempt.student,
@@ -311,8 +314,9 @@ export class AttemptsService {
         title: attempt.session.exam.title,
         passScore,
         durationMinutes: attempt.session.exam.durationMinutes,
+        totalPoints, // note maximale (somme des points des questions)
       },
-      passed: attempt.score !== null && attempt.score >= passScore,
+      passed: percentage >= passScore,
       correction,
     };
   }
@@ -324,19 +328,38 @@ export class AttemptsService {
       orderBy: { submittedAt: 'desc' },
       include: {
         session: {
-          include: { exam: { select: { title: true, passScore: true } } },
+          include: {
+            exam: {
+              select: {
+                title: true,
+                passScore: true,
+                examQuestions: {
+                  select: { question: { select: { points: true } } },
+                },
+              },
+            },
+          },
         },
       },
     });
 
-    return attempts.map((a) => ({
-      attemptId: a.id,
-      examTitle: a.session.exam.title,
-      score: a.score,
-      passed: a.score !== null && a.score >= a.session.exam.passScore,
-      status: a.status,
-      submittedAt: a.submittedAt,
-    }));
+    return attempts.map((a) => {
+      const totalPoints = a.session.exam.examQuestions.reduce(
+        (sum, eq) => sum + eq.question.points,
+        0,
+      );
+      const percentage =
+        a.score !== null && totalPoints > 0 ? (a.score / totalPoints) * 100 : 0;
+      return {
+        attemptId: a.id,
+        examTitle: a.session.exam.title,
+        score: a.score, // points
+        totalPoints,
+        passed: percentage >= a.session.exam.passScore,
+        status: a.status,
+        submittedAt: a.submittedAt,
+      };
+    });
   }
 
   // ------------------------------------------------------------

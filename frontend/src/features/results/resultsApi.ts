@@ -48,3 +48,52 @@ export const getResults = (
 
 export const getResultDetail = (attemptId: string) =>
   api.get<StaffResult>(`/results/${attemptId}`).then((r) => r.data)
+
+// ---- Résultats par évaluation (Phase C) ----
+export type ResultStatus = 'Très Bien' | 'Bien' | 'Passable' | 'Mauvais'
+
+export interface EvaluationResultStudent {
+  attemptId: string
+  firstName: string
+  lastName: string
+  email: string
+  submittedAt: string | null
+  timeSpentSeconds: number | null
+  correctCount: number
+  incorrectCount: number
+  unansweredCount: number
+  note: number
+  status: ResultStatus
+  observation: string
+}
+
+export interface EvaluationResults {
+  evaluation: {
+    id: string
+    title: string
+    passScore: number
+    totalPoints: number
+  }
+  stats: {
+    participants: number
+    average: number
+    max: number
+    min: number
+    median: number
+    stdDev: number
+    successRate: number
+    distribution: {
+      tresBien: number
+      bien: number
+      passable: number
+      mauvais: number
+    }
+  }
+  students: EvaluationResultStudent[]
+}
+
+export const getEvaluationResults = (evaluationId: string) =>
+  api
+    .get<EvaluationResults>(`/results/evaluation/${evaluationId}`)
+    .then((r) => r.data)
+

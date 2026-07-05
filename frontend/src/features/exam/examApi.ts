@@ -40,7 +40,12 @@ export interface ResultResponse {
     score: number | null
     submittedAt: string | null
   }
-  exam: { title: string; passScore: number; durationMinutes: number }
+  exam: {
+    title: string
+    passScore: number
+    durationMinutes: number
+    totalPoints: number
+  }
   passed: boolean
   correction: CorrectionItem[]
 }
