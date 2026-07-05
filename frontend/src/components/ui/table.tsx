@@ -47,7 +47,7 @@ export function TableRow({
 }: HTMLAttributes<HTMLTableRowElement>) {
   return (
     <tr
-      className={cn('transition-colors hover:bg-muted/40', className)}
+      className={cn('transition-colors hover:bg-primary/5', className)}
       {...props}
     />
   )

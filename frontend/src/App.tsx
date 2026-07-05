@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react'
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { ComingSoon } from './components/ComingSoon'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
 // ------------------------------------------------------------
@@ -39,6 +40,16 @@ const QuestionsPage = lazy(() =>
 )
 const ExamsPage = lazy(() =>
   import('./features/exams/ExamsPage').then((m) => ({ default: m.ExamsPage })),
+)
+const EvaluationsListPage = lazy(() =>
+  import('./features/evaluations/EvaluationsListPage').then((m) => ({
+    default: m.EvaluationsListPage,
+  })),
+)
+const EvaluationWizard = lazy(() =>
+  import('./features/evaluations/EvaluationWizard').then((m) => ({
+    default: m.EvaluationWizard,
+  })),
 )
 const CreateExamWizard = lazy(() =>
   import('./features/exams/CreateExamWizard').then((m) => ({
@@ -107,6 +118,25 @@ export default function App() {
           />
           <Route path="/admin/sessions" element={<SessionsPage />} />
           <Route path="/admin/resultats" element={<ResultsPage />} />
+
+          {/* v2 : module Évaluations */}
+          <Route path="/evaluations" element={<EvaluationsListPage />} />
+          <Route path="/evaluations/nouvelle" element={<EvaluationWizard />} />
+
+          {/* Modules à venir */}
+          <Route
+            path="/admin/utilisateurs"
+            element={<ComingSoon title="Utilisateurs" />}
+          />
+          <Route path="/admin/groupes" element={<ComingSoon title="Groupes" />} />
+          <Route
+            path="/admin/certificats"
+            element={<ComingSoon title="Certificats" />}
+          />
+          <Route
+            path="/admin/rapports"
+            element={<ComingSoon title="Rapports" />}
+          />
         </Route>
 
         {/* Passage d'évaluation (étudiant), plein écran */}

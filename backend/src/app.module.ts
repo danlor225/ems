@@ -14,6 +14,8 @@ import { AttemptsModule } from './modules/attempts/attempts.module';
 import { ResultsModule } from './modules/results/results.module';
 import { StatsModule } from './modules/stats/stats.module';
 import { ActivityLogModule } from './modules/activity-log/activity-log.module';
+import { AcademicSessionsModule } from './modules/academic-sessions/academic-sessions.module';
+import { EvaluationsModule } from './modules/evaluations/evaluations.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -47,6 +49,9 @@ import { validateEnv } from './config/env.validation';
     StatsModule,
     // ActivityLogModule (@Global) : audit des actions sensibles.
     ActivityLogModule,
+    // v2 : conteneurs académiques + évaluations.
+    AcademicSessionsModule,
+    EvaluationsModule,
   ],
   controllers: [AppController],
   providers: [

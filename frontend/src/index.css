@@ -1,13 +1,12 @@
 /* ============================================================
-   EMS Design System — Tailwind v4
-   Tokens sémantiques (clair + sombre), typographie Geist,
-   radius et shadows. Les couleurs "ems-*" sont conservées le
-   temps de migrer les écrans.
+   EMS Design System — Charte officielle (STRICTE).
+   Palette imposée : #1D4ED8 (primary), #1E3A8A (dark/sidebar),
+   #60A5FA (sky), #10B981 (success), #F59E0B (warning),
+   #6366F1 (info), neutres #0F172A/#334155/#CBD5E1/#F2F4F7/#FFF.
    ============================================================ */
 @import 'tailwindcss';
 @import '@fontsource-variable/geist';
 
-/* Active la variante "dark:" via une classe .dark sur <html>. */
 @custom-variant dark (&:is(.dark *));
 
 /* ---------- Thème clair ---------- */
@@ -15,73 +14,84 @@
   --radius: 0.75rem;
 
   --background: #ffffff;
-  --foreground: #0f172a; /* slate-900 */
+  --foreground: #0f172a; /* Gris 900 — texte principal */
 
   --card: #ffffff;
   --card-foreground: #0f172a;
   --popover: #ffffff;
   --popover-foreground: #0f172a;
 
-  --primary: #1d4ed8; /* Bleu EMS */
+  --primary: #1d4ed8; /* Bleu primaire EMS */
   --primary-foreground: #ffffff;
+  --primary-hover: #1e40af; /* Hover bouton primaire */
 
-  --secondary: #f1f5f9; /* slate-100 */
-  --secondary-foreground: #0f172a;
+  --secondary: #f2f4f7; /* Gris 100 */
+  --secondary-foreground: #1e3a8a; /* Bleu foncé */
 
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b; /* slate-500 */
+  --muted: #f2f4f7;
+  --muted-foreground: #334155; /* Gris 700 — texte secondaire */
 
-  --accent: #eff6ff; /* blue-50 */
-  --accent-foreground: #1e3a8a; /* Bleu foncé EMS */
+  --accent: #eff6ff; /* Bleu très clair (hover) */
+  --accent-foreground: #1e3a8a;
 
   --success: #10b981;
   --success-foreground: #ffffff;
   --warning: #f59e0b;
   --warning-foreground: #ffffff;
-  --danger: #ef4444;
+  --danger: #ef4444; /* Rouge doux */
   --danger-foreground: #ffffff;
-  --info: #3b82f6;
+  --info: #6366f1; /* Violet information */
   --info-foreground: #ffffff;
+  --sky: #60a5fa; /* Bleu ciel */
 
-  --border: #e2e8f0; /* slate-200 */
-  --input: #e2e8f0;
+  --border: #cbd5e1; /* Gris 300 */
+  --input: #cbd5e1;
   --ring: #1d4ed8;
+
+  /* Sidebar — identité EMS (même valeur en clair et sombre) */
+  --sidebar: #1e3a8a;
+  --sidebar-active: #1d4ed8;
 }
 
 /* ---------- Thème sombre ---------- */
 .dark {
-  --background: #0b1220; /* navy profond */
-  --foreground: #e2e8f0;
+  --background: #0f172a; /* Gris 900 */
+  --foreground: #f1f5f9;
 
-  --card: #0f172a;
-  --card-foreground: #e2e8f0;
-  --popover: #0f172a;
-  --popover-foreground: #e2e8f0;
+  --card: #1e293b;
+  --card-foreground: #f1f5f9;
+  --popover: #1e293b;
+  --popover-foreground: #f1f5f9;
 
-  --primary: #3b82f6; /* bleu plus lumineux sur fond sombre */
-  --primary-foreground: #0b1220;
+  --primary: #1d4ed8; /* Accent identitaire conservé */
+  --primary-foreground: #ffffff;
+  --primary-hover: #1e40af;
 
   --secondary: #1e293b;
-  --secondary-foreground: #e2e8f0;
+  --secondary-foreground: #f1f5f9;
 
   --muted: #1e293b;
   --muted-foreground: #94a3b8;
 
-  --accent: #172554;
+  --accent: #1e3a8a;
   --accent-foreground: #bfdbfe;
 
-  --success: #34d399;
+  --success: #10b981;
   --success-foreground: #052e1a;
-  --warning: #fbbf24;
+  --warning: #f59e0b;
   --warning-foreground: #251803;
   --danger: #f87171;
   --danger-foreground: #300;
-  --info: #60a5fa;
-  --info-foreground: #05203f;
+  --info: #6366f1;
+  --info-foreground: #ffffff;
+  --sky: #60a5fa;
 
-  --border: #1e293b;
-  --input: #1e293b;
-  --ring: #3b82f6;
+  --border: #334155;
+  --input: #334155;
+  --ring: #60a5fa;
+
+  --sidebar: #1e3a8a;
+  --sidebar-active: #1d4ed8;
 }
 
 /* ---------- Mapping vers les utilitaires Tailwind ---------- */
@@ -94,6 +104,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -108,15 +119,12 @@
   --color-danger-foreground: var(--danger-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  --color-sky: var(--sky);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-
-  /* Compatibilité : anciens tokens ems-* (à retirer après migration). */
-  --color-ems-primary: #1d4ed8;
-  --color-ems-dark: #1e3a8a;
-  --color-ems-sky: #60a5fa;
-  --color-ems-bg: #f2f4f7;
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-active: var(--sidebar-active);
 
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
 
@@ -125,7 +133,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-2xl: calc(var(--radius) + 8px); /* 20px — rayon des cartes */
 
   --shadow-soft: 0 1px 2px rgba(2, 6, 23, 0.04), 0 1px 3px rgba(2, 6, 23, 0.06);
   --shadow-medium: 0 4px 6px -1px rgba(2, 6, 23, 0.06),
@@ -144,7 +152,6 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
-  /* Focus visible cohérent et accessible (WCAG AA). */
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;

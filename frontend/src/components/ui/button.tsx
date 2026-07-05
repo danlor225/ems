@@ -14,11 +14,12 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground shadow-soft hover:bg-primary/90',
+        default:
+          'bg-primary text-primary-foreground shadow-soft hover:bg-primary-hover',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+          'border border-input bg-background text-secondary-foreground hover:bg-muted',
         ghost: 'text-foreground hover:bg-muted',
-        outline: 'border border-border bg-background hover:bg-muted',
+        outline: 'border border-input bg-background hover:bg-muted',
         destructive:
           'bg-danger text-danger-foreground shadow-soft hover:bg-danger/90',
       },

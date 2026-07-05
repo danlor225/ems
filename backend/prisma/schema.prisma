@@ -59,9 +59,15 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  refreshTokens RefreshToken[]
-  attempts      Attempt[]
-  activityLogs  ActivityLog[]
+  // --- v2 : gestion utilisateurs ---
+  avatarUrl   String?   @map("avatar_url")
+  isLocked    Boolean   @default(false) @map("is_locked")
+  lastLoginAt DateTime? @map("last_login_at")
+
+  refreshTokens        RefreshToken[]
+  attempts             Attempt[]
+  activityLogs         ActivityLog[]
+  evaluationsAuthored  Exam[]         @relation("EvaluationAuthor")
 
   @@map("users")
 }
@@ -132,21 +138,68 @@ model AnswerOption {
 //  EXAMENS & SESSIONS
 // ------------------------------------------------------------
 
+// Statut d'une évaluation (cycle de vie v2).
+enum EvaluationStatus {
+  DRAFT
+  PUBLISHED
+  OPEN
+  CLOSED
+  ARCHIVED
+}
+
+// L'ancien "Exam" devient l'"Évaluation" enrichie (approche additive :
+// les colonnes v2 sont ajoutées, l'existant continue de fonctionner).
 model Exam {
   id              String   @id @default(uuid()) @db.Uuid
   subjectId       String   @map("subject_id") @db.Uuid
   title           String   @db.VarChar(200)
-  durationMinutes Int      @map("duration_minutes") // durée configurable
-  passScore       Int      @default(50) @map("pass_score") // seuil de réussite (%) configurable par examen
+  durationMinutes Int      @map("duration_minutes")
+  passScore       Int      @default(50) @map("pass_score") // = score minimal de réussite (%)
   isPublished     Boolean  @default(false) @map("is_published")
   createdAt       DateTime @default(now()) @map("created_at")
 
-  subject       Subject        @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  examQuestions ExamQuestion[]
-  sessions      Session[]
+  // --- Évolution v2 ---
+  code                  String?          @unique // généré (ex EVAL-2025-0001), non modifiable
+  description           String?
+  maxScore              Int              @default(100) @map("max_score")
+  extraTimeMinutes      Int              @default(0) @map("extra_time_minutes")
+  attemptsAllowed       Int              @default(1) @map("attempts_allowed")
+  randomizeQuestions    Boolean          @default(true) @map("randomize_questions")
+  oneQuestionAtATime    Boolean          @default(false) @map("one_question_at_a_time")
+  shuffleAnswers        Boolean          @default(true) @map("shuffle_answers")
+  showResultImmediately Boolean          @default(true) @map("show_result_immediately")
+  autoGrade             Boolean          @default(true) @map("auto_grade")
+  level                 String?
+  groupId               String?          @map("group_id") // FK Group ajoutée en phase G
+  status                EvaluationStatus @default(DRAFT)
+  publishedAt           DateTime?        @map("published_at")
+  authorId              String?          @map("author_id") @db.Uuid
+  academicSessionId     String?          @map("academic_session_id") @db.Uuid
+
+  subject         Subject          @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  author          User?            @relation("EvaluationAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  academicSession AcademicSession? @relation(fields: [academicSessionId], references: [id], onDelete: SetNull)
+  examQuestions   ExamQuestion[]
+  sessions        Session[]
 
   @@index([subjectId])
+  @@index([academicSessionId])
   @@map("exams")
+}
+
+// Conteneur académique (année/période) regroupant des évaluations.
+model AcademicSession {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(200)
+  academicYear String   @map("academic_year")
+  startDate    DateTime @map("start_date")
+  endDate      DateTime @map("end_date")
+  description  String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  evaluations Exam[]
+
+  @@map("academic_sessions")
 }
 
 // Table de jointure Exam <-> Question (un examen se compose de N questions).
