@@ -41,7 +41,7 @@ export class CreateEvaluationDto {
   @IsOptional() @IsBoolean() autoGrade?: boolean;
 
   @IsOptional() @IsString() level?: string;
-  @IsOptional() @IsString() groupId?: string;
+  @IsOptional() @IsUUID() groupId?: string;
 
   @IsOptional()
   @IsArray()

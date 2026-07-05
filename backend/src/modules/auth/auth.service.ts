@@ -78,7 +78,10 @@ export class AuthService {
   }
 
   /** Connexion : vérifie les identifiants, renvoie tokens + utilisateur "safe". */
-  async login(dto: LoginDto): Promise<AuthTokens & { user: SafeUser }> {
+  async login(
+    dto: LoginDto,
+    meta?: { ip?: string; userAgent?: string },
+  ): Promise<AuthTokens & { user: SafeUser }> {
     const user = await this.usersService.findByEmail(dto.email);
 
     // Comparaison systématique (anti-timing) contre un hash réel ou leurre.
@@ -92,8 +95,15 @@ export class AuthService {
     if (!user.isActive) {
       throw new UnauthorizedException('Ce compte est désactivé.');
     }
+    if (user.isLocked) {
+      throw new UnauthorizedException('Ce compte est verrouillé.');
+    }
 
     const tokens = await this.issueTokenPair(user);
+    // Journalisation de la connexion (best-effort, ne bloque pas le login).
+    await this.usersService
+      .recordLogin(user.id, meta?.ip, meta?.userAgent)
+      .catch(() => undefined);
     return { ...tokens, user: this.toSafeUser(user) };
   }
 

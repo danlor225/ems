@@ -68,7 +68,7 @@ export class EvaluationsService {
         showResultImmediately: dto.showResultImmediately,
         autoGrade: dto.autoGrade,
         level: dto.level,
-        groupId: dto.groupId,
+        ...(dto.groupId ? { group: { connect: { id: dto.groupId } } } : {}),
         subject: { connect: { id: dto.subjectId } },
         academicSession: { connect: { id: dto.academicSessionId } },
         author: { connect: { id: actor.id } },
@@ -111,7 +111,13 @@ export class EvaluationsService {
         showResultImmediately: dto.showResultImmediately,
         autoGrade: dto.autoGrade,
         level: dto.level,
-        groupId: dto.groupId,
+        ...(dto.groupId !== undefined
+          ? {
+              group: dto.groupId
+                ? { connect: { id: dto.groupId } }
+                : { disconnect: true },
+            }
+          : {}),
         ...(dto.academicSessionId
           ? { academicSession: { connect: { id: dto.academicSessionId } } }
           : {}),
@@ -238,12 +244,14 @@ export class EvaluationsService {
         showResultImmediately: exam.showResultImmediately,
         autoGrade: exam.autoGrade,
         level: exam.level,
-        groupId: exam.groupId,
+        group: exam.groupId
+          ? { connect: { id: exam.groupId } }
+          : undefined,
         subject: { connect: { id: exam.subjectId } },
         author: { connect: { id: actor.id } },
-        ...(exam.academicSessionId
-          ? { academicSession: { connect: { id: exam.academicSessionId } } }
-          : {}),
+        academicSession: exam.academicSessionId
+          ? { connect: { id: exam.academicSessionId } }
+          : undefined,
         examQuestions: {
           create: exam.examQuestions.map((eq) => ({
             question: { connect: { id: eq.questionId } },

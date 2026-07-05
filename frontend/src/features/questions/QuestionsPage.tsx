@@ -5,8 +5,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import { Plus, Trash2, X } from 'lucide-react'
-import { useState } from 'react'
+import { Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useRef, useState } from 'react'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,12 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { getSubjects } from '../subjects/subjectsApi'
-import { createQuestion, deleteQuestion, getQuestions } from './questionsApi'
+import {
+  createQuestion,
+  deleteQuestion,
+  getQuestions,
+  updateQuestion,
+} from './questionsApi'
 
 const schema = z
   .object({
@@ -38,6 +43,8 @@ export function QuestionsPage() {
   const queryClient = useQueryClient()
   const [subjectFilter, setSubjectFilter] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null)
+  const formSectionRef = useRef<HTMLDivElement>(null)
 
   const { data: subjects } = useQuery({
     queryKey: ['subjects'],
@@ -56,6 +63,7 @@ export function QuestionsPage() {
     handleSubmit,
     control,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -84,9 +92,30 @@ export function QuestionsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['questions'] })
       reset()
+      setEditingQuestionId(null)
       setActionError(null)
     },
     onError: () => setActionError('Erreur lors de la création.'),
+  })
+
+  const update = useMutation({
+    mutationFn: (v: FormValues) =>
+      updateQuestion(editingQuestionId!, {
+        subjectId: v.subjectId,
+        statement: v.statement,
+        points: v.points,
+        options: v.options.map((o, i) => ({
+          text: o.text,
+          isCorrect: i === v.correctIndex,
+        })),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['questions'] })
+      reset()
+      setEditingQuestionId(null)
+      setActionError(null)
+    },
+    onError: () => setActionError('Erreur lors de la modification.'),
   })
 
   const del = useMutation({
@@ -107,13 +136,14 @@ export function QuestionsPage() {
       </h1>
 
       {/* Création */}
+      <div ref={formSectionRef}>
       <Card>
         <CardHeader>
           <CardTitle>Nouvelle question</CardTitle>
         </CardHeader>
         <CardContent>
           <form
-            onSubmit={handleSubmit((v) => create.mutate(v))}
+            onSubmit={handleSubmit((v) => (editingQuestionId ? update.mutate(v) : create.mutate(v)))}
             className="space-y-4"
           >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -216,12 +246,31 @@ export function QuestionsPage() {
               </Button>
             </div>
 
-            <Button type="submit" loading={create.isPending}>
-              Créer la question
-            </Button>
+            <div className="flex items-center gap-2">
+              {editingQuestionId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    reset()
+                    setEditingQuestionId(null)
+                    setActionError(null)
+                  }}
+                >
+                  Annuler
+                </Button>
+              )}
+              <Button
+                type="submit"
+                loading={create.isPending || update.isPending}
+              >
+                {editingQuestionId ? 'Enregistrer les modifications' : 'Créer la question'}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
+      </div>
 
       {actionError && (
         <div className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -274,15 +323,42 @@ export function QuestionsPage() {
                     {!q.isActive && ' · désactivée'}
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Supprimer"
-                  onClick={() => del.mutate(q.id)}
-                  className="shrink-0 text-muted-foreground hover:text-danger"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Modifier"
+                    onClick={() => {
+                      setEditingQuestionId(q.id)
+                      setValue('subjectId', q.subjectId)
+                      setValue('statement', q.statement)
+                      setValue('points', q.points)
+                      const correctIndex = q.options.findIndex((o) => o.isCorrect)
+                      setValue('correctIndex', correctIndex >= 0 ? correctIndex : 0)
+                      setValue('options', q.options.map((o) => ({ text: o.text })))
+                      setActionError(null)
+                      requestAnimationFrame(() => {
+                        formSectionRef.current?.scrollIntoView({
+                          behavior: 'smooth',
+                          block: 'start',
+                        })
+                        document.getElementById('subjectId')?.focus()
+                      })
+                    }}
+                    className="shrink-0 text-muted-foreground hover:text-primary"
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Supprimer"
+                    onClick={() => del.mutate(q.id)}
+                    className="shrink-0 text-muted-foreground hover:text-danger"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>

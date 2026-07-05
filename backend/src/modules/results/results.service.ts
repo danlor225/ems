@@ -126,7 +126,15 @@ export class ResultsService {
       },
       orderBy: { score: 'desc' },
       include: {
-        student: { select: { firstName: true, lastName: true, email: true } },
+        student: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            matricule: true,
+            group: { select: { name: true } },
+          },
+        },
         answers: { select: { questionId: true, selectedOptionId: true } },
       },
     });
@@ -155,6 +163,8 @@ export class ResultsService {
         firstName: a.student.firstName,
         lastName: a.student.lastName,
         email: a.student.email,
+        matricule: a.student.matricule,
+        className: a.student.group?.name ?? null,
         submittedAt: a.submittedAt,
         timeSpentSeconds,
         correctCount,

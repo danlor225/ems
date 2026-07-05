@@ -7,8 +7,10 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
+  Ip,
   Patch,
   Post,
   UseGuards,
@@ -43,8 +45,12 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK) // 200 : pas de création de ressource, juste une vérification
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  login(
+    @Body() dto: LoginDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.authService.login(dto, { ip, userAgent });
   }
 
   // POST /api/auth/refresh — échange un refresh token contre une nouvelle paire.

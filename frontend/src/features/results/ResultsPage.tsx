@@ -3,7 +3,7 @@
 //  Sélection d'une évaluation -> analyses + tableau étudiants
 //  (observations auto) + modale de correction.
 // ============================================================
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useState } from 'react'
@@ -40,6 +40,11 @@ import {
 import { cn } from '@/lib/utils'
 import { getEvaluations } from '../evaluations/evaluationsApi'
 import {
+  issueCertificate,
+  issueCertificatesForEvaluation,
+} from '../certificates/certificatesApi'
+import { generateCertificatePdf } from '../certificates/certificatePdf'
+import {
   getEvaluationResults,
   getResultDetail,
   type ResultStatus,
@@ -48,6 +53,7 @@ import {
   Award,
   CheckCircle2,
   Download,
+  GraduationCap,
   TrendingUp,
   Users,
 } from 'lucide-react'
@@ -166,6 +172,16 @@ export function ResultsPage() {
 
   const selectedEval = evaluations?.data.find((e) => e.id === evaluationId)
   const canExport = !!data && data.students.length > 0
+
+  // Émission groupée des certificats pour tous les admis de l'évaluation.
+  const bulkIssue = useMutation({
+    mutationFn: () => issueCertificatesForEvaluation(evaluationId),
+    onSuccess: (r) => {
+      window.alert(
+        `Certificats émis : ${r.issued}\nDéjà existants / non éligibles ignorés : ${r.candidates - r.issued}`,
+      )
+    },
+  })
   const exportMeta = {
     code: selectedEval?.code,
     subject: selectedEval?.subject,
@@ -213,6 +229,16 @@ export function ResultsPage() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <Button
+            variant="outline"
+            disabled={!canExport || bulkIssue.isPending}
+            loading={bulkIssue.isPending}
+            onClick={() => bulkIssue.mutate()}
+          >
+            <GraduationCap className="size-4" />
+            Émettre certificats
+          </Button>
         </div>
       </div>
 
@@ -334,6 +360,8 @@ export function ResultsPage() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Étudiant</TableHead>
+                  <TableHead>Matricule</TableHead>
+                  <TableHead>Classe</TableHead>
                   <TableHead>Bonnes</TableHead>
                   <TableHead>Mauvaises</TableHead>
                   <TableHead>Note</TableHead>
@@ -348,6 +376,12 @@ export function ResultsPage() {
                   <TableRow key={s.attemptId}>
                     <TableCell className="font-medium text-foreground">
                       {s.firstName} {s.lastName}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {s.matricule ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {s.className ?? '—'}
                     </TableCell>
                     <TableCell className="text-success">{s.correctCount}</TableCell>
                     <TableCell className="text-danger">{s.incorrectCount}</TableCell>
@@ -364,9 +398,15 @@ export function ResultsPage() {
                       <span className="line-clamp-2">{s.observation}</span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setSelectedAttempt(s.attemptId)}>
-                        Voir réponses
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        {(s.note / data.evaluation.totalPoints) * 100 >=
+                          data.evaluation.passScore && (
+                          <IssueCertButton attemptId={s.attemptId} />
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedAttempt(s.attemptId)}>
+                          Voir réponses
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -382,5 +422,28 @@ export function ResultsPage() {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+// Émet (ou récupère, idempotent) le certificat d'un étudiant admis,
+// puis télécharge immédiatement le PDF.
+function IssueCertButton({ attemptId }: { attemptId: string }) {
+  const [loading, setLoading] = useState(false)
+  async function handle() {
+    setLoading(true)
+    try {
+      const cert = await issueCertificate(attemptId)
+      await generateCertificatePdf(cert)
+    } catch {
+      window.alert("Impossible d'émettre le certificat.")
+    } finally {
+      setLoading(false)
+    }
+  }
+  return (
+    <Button variant="outline" size="sm" loading={loading} onClick={handle}>
+      <GraduationCap className="size-4" />
+      Certificat
+    </Button>
   )
 }

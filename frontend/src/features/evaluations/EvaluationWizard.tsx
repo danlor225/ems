@@ -9,7 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Check, PartyPopper } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -24,7 +24,13 @@ import {
   createAcademicSession,
   getAcademicSessions,
 } from './academicSessionsApi'
-import { createEvaluation, publishEvaluation } from './evaluationsApi'
+import {
+  createEvaluation,
+  getEvaluation,
+  publishEvaluation,
+  setEvaluationQuestions,
+  updateEvaluation,
+} from './evaluationsApi'
 
 const EASE = [0.16, 1, 0.3, 1] as const
 const STEPS = ['Session', 'Configuration', 'Questions', 'Publication']
@@ -65,6 +71,7 @@ const TOGGLES: { key: keyof ConfigValues; label: string }[] = [
 
 export function EvaluationWizard() {
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const [step, setStep] = useState(0)
   const [academicSessionId, setAcademicSessionId] = useState('')
@@ -75,6 +82,8 @@ export function EvaluationWizard() {
   const [closesAt, setClosesAt] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const [editingEvaluationId, setEditingEvaluationId] = useState<string | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
 
   // Nouvelle session académique (inline)
   const [creatingSession, setCreatingSession] = useState(false)
@@ -105,6 +114,12 @@ export function EvaluationWizard() {
     queryKey: ['academic-sessions'],
     queryFn: getAcademicSessions,
   })
+  const evaluationIdFromState = (location.state as { evaluationId?: string } | null)?.evaluationId ?? null
+  const { data: editingEvaluation } = useQuery({
+    queryKey: ['evaluation', evaluationIdFromState],
+    queryFn: () => getEvaluation(evaluationIdFromState!),
+    enabled: !!evaluationIdFromState,
+  })
   const { data: subjects } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => getSubjects(),
@@ -116,6 +131,29 @@ export function EvaluationWizard() {
   })
 
   useEffect(() => setSelected([]), [subjectId])
+
+  useEffect(() => {
+    if (!editingEvaluation) return
+    setEditingEvaluationId(editingEvaluation.id)
+    setIsEditing(true)
+    setAcademicSessionId(editingEvaluation.academicSession?.id ?? '')
+    setSubjectId(editingEvaluation.subject?.id ?? '')
+    setSelected(editingEvaluation.examQuestions.map((q) => q.question.id))
+    form.reset({
+      name: editingEvaluation.title,
+      description: editingEvaluation.description ?? '',
+      durationMinutes: editingEvaluation.durationMinutes,
+      passScore: editingEvaluation.passScore,
+      maxScore: editingEvaluation.maxScore,
+      extraTimeMinutes: editingEvaluation.extraTimeMinutes,
+      attemptsAllowed: editingEvaluation.attemptsAllowed,
+      randomizeQuestions: editingEvaluation.randomizeQuestions,
+      oneQuestionAtATime: editingEvaluation.oneQuestionAtATime,
+      shuffleAnswers: editingEvaluation.shuffleAnswers,
+      showResultImmediately: editingEvaluation.showResultImmediately,
+      autoGrade: editingEvaluation.autoGrade,
+    })
+  }, [editingEvaluation, form])
 
   const createSession = useMutation({
     mutationFn: () =>
@@ -136,6 +174,15 @@ export function EvaluationWizard() {
 
   const finish = useMutation({
     mutationFn: async () => {
+      if (isEditing && editingEvaluationId) {
+        await updateEvaluation(editingEvaluationId, {
+          ...form.getValues(),
+          academicSessionId,
+        })
+        await setEvaluationQuestions(editingEvaluationId, selected)
+        return
+      }
+
       const evaluation = await createEvaluation({
         ...form.getValues(),
         subjectId,
@@ -225,7 +272,7 @@ export function EvaluationWizard() {
           Retour aux évaluations
         </button>
         <h1 className="text-xl font-bold tracking-tight text-foreground">
-          Nouvelle évaluation
+          {isEditing ? 'Modifier l’évaluation' : 'Nouvelle évaluation'}
         </h1>
       </div>
 
@@ -630,7 +677,7 @@ export function EvaluationWizard() {
             ) : (
               <Button onClick={() => finish.mutate()} loading={finish.isPending}>
                 <Check className="size-4" />
-                Créer l'évaluation
+                {isEditing ? 'Enregistrer les modifications' : 'Créer l’évaluation'}
               </Button>
             )}
           </div>

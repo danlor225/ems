@@ -76,12 +76,27 @@ export function ResultPage() {
                   / {data.exam.totalPoints}
                 </span>
               </p>
-              <Badge
-                variant={data.passed ? 'success' : 'danger'}
-                className="mt-3"
-              >
-                {data.passed ? 'Réussi' : 'Échoué'} — seuil {data.exam.passScore}
-                %
+              <Badge variant="info" className="mt-3">
+                {(() => {
+                  const score = data.attempt.score ?? 0
+                  const percentage =
+                    data.exam.totalPoints > 0
+                      ? (score / data.exam.totalPoints) * 100
+                      : 0
+
+                  if (score >= 17 || percentage >= 85) return 'Très bien'
+                  if (
+                    (score >= 14 && score <= 16) ||
+                    (percentage >= 70 && percentage < 85)
+                  )
+                    return 'Bien'
+                  if (
+                    (score >= 10 && score <= 13) ||
+                    (percentage >= 50 && percentage < 70)
+                  )
+                    return 'Passable'
+                  return 'Mauvais'
+                })()}
               </Badge>
             </CardContent>
           </Card>

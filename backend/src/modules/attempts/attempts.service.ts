@@ -352,6 +352,7 @@ export class AttemptsService {
         a.score !== null && totalPoints > 0 ? (a.score / totalPoints) * 100 : 0;
       return {
         attemptId: a.id,
+        sessionId: a.sessionId,
         examTitle: a.session.exam.title,
         score: a.score, // points
         totalPoints,

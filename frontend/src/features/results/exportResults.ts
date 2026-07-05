@@ -15,6 +15,8 @@ export interface ExportMeta {
 const HEADERS = [
   'Nom',
   'Prénom',
+  'Matricule',
+  'Classe',
   'Bonnes',
   'Mauvaises',
   'Note',
@@ -29,6 +31,8 @@ function rowsOf(r: EvaluationResults) {
   return r.students.map((s) => [
     s.lastName,
     s.firstName,
+    s.matricule ?? '',
+    s.className ?? '',
     s.correctCount,
     s.incorrectCount,
     s.note,
@@ -143,10 +147,14 @@ export async function exportPdf(r: EvaluationResults, meta: ExportMeta) {
 
   autoTable(doc, {
     startY: 44,
-    head: [['Nom', 'Prénom', 'Bonnes', 'Mauvaises', 'Note', 'Statut']],
+    head: [
+      ['Nom', 'Prénom', 'Matricule', 'Classe', 'Bonnes', 'Mauvaises', 'Note', 'Statut'],
+    ],
     body: r.students.map((s) => [
       s.lastName,
       s.firstName,
+      s.matricule ?? '—',
+      s.className ?? '—',
       s.correctCount,
       s.incorrectCount,
       `${s.note} / ${total}`,

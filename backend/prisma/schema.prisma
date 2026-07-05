@@ -64,12 +64,34 @@ model User {
   isLocked    Boolean   @default(false) @map("is_locked")
   lastLoginAt DateTime? @map("last_login_at")
 
+  // --- v2 : appartenance à un groupe / classe ---
+  matricule String? @unique @db.VarChar(50) // identifiant étudiant (optionnel, unique)
+  groupId   String? @map("group_id") @db.Uuid
+
   refreshTokens        RefreshToken[]
   attempts             Attempt[]
   activityLogs         ActivityLog[]
   evaluationsAuthored  Exam[]         @relation("EvaluationAuthor")
+  loginHistory         LoginHistory[]
+  certificatesIssued   Certificate[]  @relation("CertificateIssuer")
+  group                Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
+  @@index([groupId])
   @@map("users")
+}
+
+// Historique des connexions (audit / dernière activité).
+model LoginHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  ip        String?
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("login_history")
 }
 
 model RefreshToken {
@@ -170,7 +192,7 @@ model Exam {
   showResultImmediately Boolean          @default(true) @map("show_result_immediately")
   autoGrade             Boolean          @default(true) @map("auto_grade")
   level                 String?
-  groupId               String?          @map("group_id") // FK Group ajoutée en phase G
+  groupId               String?          @map("group_id") @db.Uuid
   status                EvaluationStatus @default(DRAFT)
   publishedAt           DateTime?        @map("published_at")
   authorId              String?          @map("author_id") @db.Uuid
@@ -179,11 +201,13 @@ model Exam {
   subject         Subject          @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   author          User?            @relation("EvaluationAuthor", fields: [authorId], references: [id], onDelete: SetNull)
   academicSession AcademicSession? @relation(fields: [academicSessionId], references: [id], onDelete: SetNull)
+  group           Group?           @relation(fields: [groupId], references: [id], onDelete: SetNull)
   examQuestions   ExamQuestion[]
   sessions        Session[]
 
   @@index([subjectId])
   @@index([academicSessionId])
+  @@index([groupId])
   @@map("exams")
 }
 
@@ -200,6 +224,23 @@ model AcademicSession {
   evaluations Exam[]
 
   @@map("academic_sessions")
+}
+
+// Groupe / Classe : cohorte d'étudiants (ex "L3 Info 2025-2026").
+// Un étudiant appartient à AU PLUS un groupe (relation 1..N).
+model Group {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(150)
+  level        String?  @db.VarChar(50) // ex "L3", "M1"
+  academicYear String?  @map("academic_year") @db.VarChar(20)
+  description  String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  students    User[]
+  evaluations Exam[]
+
+  @@map("groups")
 }
 
 // Table de jointure Exam <-> Question (un examen se compose de N questions).
@@ -245,9 +286,10 @@ model Attempt {
   score         Float? // calculé à la soumission
   questionOrder Json          @map("question_order") // ordre aléatoire des questions, FIGÉ par tentative
 
-  session Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  student User            @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  answers AttemptAnswer[]
+  session     Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student     User            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers     AttemptAnswer[]
+  certificate Certificate?
 
   @@unique([sessionId, studentId]) // RÈGLE MÉTIER : une seule tentative par étudiant et par session
   @@index([studentId])
@@ -268,6 +310,41 @@ model AttemptAnswer {
 
   @@unique([attemptId, questionId]) // une seule réponse enregistrée par question => permet la sauvegarde auto (upsert)
   @@map("attempt_answers")
+}
+
+// ------------------------------------------------------------
+//  CERTIFICATS (attestations de réussite)
+// ------------------------------------------------------------
+
+// Certificat de réussite délivré pour UNE tentative réussie.
+// On stocke un SNAPSHOT immuable des données au moment de l'émission :
+// le certificat reste vérifiable même si l'utilisateur/l'évaluation
+// est modifié ou supprimé ultérieurement.
+model Certificate {
+  id        String @id @default(uuid()) @db.Uuid
+  code      String @unique // identifiant public imprimé (ex CERT-2026-0001)
+  attemptId String @unique @map("attempt_id") @db.Uuid // 1 certificat par tentative
+
+  // --- Snapshot au moment de l'émission ---
+  studentName     String  @map("student_name")
+  studentEmail    String  @map("student_email")
+  matricule       String?
+  className       String? @map("class_name")
+  evaluationTitle String  @map("evaluation_title")
+  subjectName     String? @map("subject_name")
+  note            Float // points obtenus
+  totalPoints     Int     @map("total_points")
+  mention         String // "Très Bien" / "Bien" / "Passable"
+
+  issuedById String?   @map("issued_by_id") @db.Uuid
+  issuedAt   DateTime  @default(now()) @map("issued_at")
+  revokedAt  DateTime? @map("revoked_at") // null => valide
+
+  attempt  Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  issuedBy User?   @relation("CertificateIssuer", fields: [issuedById], references: [id], onDelete: SetNull)
+
+  @@index([issuedById])
+  @@map("certificates")
 }
 
 // ------------------------------------------------------------

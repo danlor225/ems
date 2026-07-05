@@ -35,7 +35,17 @@ export const getQuestions = (subjectId?: string, page = 1, limit = 50) => {
     .then((r) => r.data)
 }
 
+export interface UpdateQuestionBody {
+  subjectId?: string
+  statement?: string
+  points?: number
+  options?: { text: string; isCorrect: boolean }[]
+}
+
 export const createQuestion = (body: CreateQuestionBody) =>
   api.post<Question>('/questions', body).then((r) => r.data)
+
+export const updateQuestion = (id: string, body: UpdateQuestionBody) =>
+  api.patch<Question>(`/questions/${id}`, body).then((r) => r.data)
 
 export const deleteQuestion = (id: string) => api.delete(`/questions/${id}`)

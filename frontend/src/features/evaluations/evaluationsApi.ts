@@ -67,10 +67,55 @@ export interface CreateEvaluationBody {
   questionIds?: string[]
 }
 
+export interface UpdateEvaluationBody {
+  name?: string
+  description?: string
+  academicSessionId?: string
+  durationMinutes?: number
+  passScore?: number
+  maxScore?: number
+  extraTimeMinutes?: number
+  attemptsAllowed?: number
+  randomizeQuestions?: boolean
+  oneQuestionAtATime?: boolean
+  shuffleAnswers?: boolean
+  showResultImmediately?: boolean
+  autoGrade?: boolean
+}
+
+export interface EvaluationDetails {
+  id: string
+  title: string
+  description: string | null
+  status: EvaluationStatus
+  durationMinutes: number
+  passScore: number
+  maxScore: number
+  extraTimeMinutes: number
+  attemptsAllowed: number
+  randomizeQuestions: boolean
+  oneQuestionAtATime: boolean
+  shuffleAnswers: boolean
+  showResultImmediately: boolean
+  autoGrade: boolean
+  subject: { id: string; name: string } | null
+  academicSession: { id: string; name: string; academicYear: string } | null
+  examQuestions: Array<{ question: { id: string } }>
+}
+
 export const createEvaluation = (body: CreateEvaluationBody) =>
   api
     .post<{ id: string; code: string | null }>('/evaluations', body)
     .then((r) => r.data)
+
+export const getEvaluation = (id: string) =>
+  api.get<EvaluationDetails>(`/evaluations/${id}`).then((r) => r.data)
+
+export const updateEvaluation = (id: string, body: UpdateEvaluationBody) =>
+  api.patch<EvaluationDetails>(`/evaluations/${id}`, body).then((r) => r.data)
+
+export const setEvaluationQuestions = (id: string, questionIds: string[]) =>
+  api.patch(`/evaluations/${id}/questions`, { questionIds })
 
 export const publishEvaluation = (
   id: string,

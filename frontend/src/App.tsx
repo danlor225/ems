@@ -51,6 +51,26 @@ const EvaluationWizard = lazy(() =>
     default: m.EvaluationWizard,
   })),
 )
+const UsersListPage = lazy(() =>
+  import('./features/users/UsersListPage').then((m) => ({
+    default: m.UsersListPage,
+  })),
+)
+const GroupsListPage = lazy(() =>
+  import('./features/groups/GroupsListPage').then((m) => ({
+    default: m.GroupsListPage,
+  })),
+)
+const CertificatesPage = lazy(() =>
+  import('./features/certificates/CertificatesPage').then((m) => ({
+    default: m.CertificatesPage,
+  })),
+)
+const CertificateVerifyPage = lazy(() =>
+  import('./features/certificates/CertificateVerifyPage').then((m) => ({
+    default: m.CertificateVerifyPage,
+  })),
+)
 const CreateExamWizard = lazy(() =>
   import('./features/exams/CreateExamWizard').then((m) => ({
     default: m.CreateExamWizard,
@@ -88,6 +108,8 @@ export default function App() {
         {/* Routes publiques */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        {/* Vérification publique d'un certificat (cible du QR code) */}
+        <Route path="/verifier/:code" element={<CertificateVerifyPage />} />
 
         {/* Coquille authentifiée (tous rôles) */}
         <Route
@@ -123,20 +145,28 @@ export default function App() {
           <Route path="/evaluations" element={<EvaluationsListPage />} />
           <Route path="/evaluations/nouvelle" element={<EvaluationWizard />} />
 
+          {/* v2 : module Groupes / Classes */}
+          <Route path="/admin/groupes" element={<GroupsListPage />} />
+
+          {/* v2 : module Certificats */}
+          <Route path="/admin/certificats" element={<CertificatesPage />} />
+
           {/* Modules à venir */}
-          <Route
-            path="/admin/utilisateurs"
-            element={<ComingSoon title="Utilisateurs" />}
-          />
-          <Route path="/admin/groupes" element={<ComingSoon title="Groupes" />} />
-          <Route
-            path="/admin/certificats"
-            element={<ComingSoon title="Certificats" />}
-          />
           <Route
             path="/admin/rapports"
             element={<ComingSoon title="Rapports" />}
           />
+        </Route>
+
+        {/* Coquille strictement ADMIN */}
+        <Route
+          element={
+            <ProtectedRoute roles={['ADMIN']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/admin/utilisateurs" element={<UsersListPage />} />
         </Route>
 
         {/* Passage d'évaluation (étudiant), plein écran */}

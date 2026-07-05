@@ -6,6 +6,7 @@ import {
   Archive,
   Copy,
   MoreVertical,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -209,6 +210,18 @@ export function EvaluationsListPage() {
                           >
                             Voir les résultats
                           </DropdownMenuItem>
+                          {e.status === 'DRAFT' && (
+                            <DropdownMenuItem
+                              onSelect={() =>
+                                navigate('/evaluations/nouvelle', {
+                                  state: { evaluationId: e.id },
+                                })
+                              }
+                            >
+                              <Pencil className="size-4" />
+                              Modifier
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onSelect={() => dup.mutate(e.id)}>
                             <Copy className="size-4" />
                             Dupliquer

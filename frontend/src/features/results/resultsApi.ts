@@ -57,6 +57,8 @@ export interface EvaluationResultStudent {
   firstName: string
   lastName: string
   email: string
+  matricule: string | null
+  className: string | null
   submittedAt: string | null
   timeSpentSeconds: number | null
   correctCount: number

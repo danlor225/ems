@@ -16,6 +16,8 @@ import { StatsModule } from './modules/stats/stats.module';
 import { ActivityLogModule } from './modules/activity-log/activity-log.module';
 import { AcademicSessionsModule } from './modules/academic-sessions/academic-sessions.module';
 import { EvaluationsModule } from './modules/evaluations/evaluations.module';
+import { GroupsModule } from './modules/groups/groups.module';
+import { CertificatesModule } from './modules/certificates/certificates.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -52,6 +54,10 @@ import { validateEnv } from './config/env.validation';
     // v2 : conteneurs académiques + évaluations.
     AcademicSessionsModule,
     EvaluationsModule,
+    // v2 : groupes / classes (routes /api/groups/...).
+    GroupsModule,
+    // v2 : certificats de réussite (routes /api/certificates/...).
+    CertificatesModule,
   ],
   controllers: [AppController],
   providers: [
