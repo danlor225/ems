@@ -4,6 +4,12 @@
 import { api } from '../../lib/api'
 import type { Paginated } from '../../lib/types'
 
+export type QuestionType =
+  | 'SINGLE_CHOICE'
+  | 'TRUE_FALSE'
+  | 'MULTIPLE_CHOICE'
+  | 'SHORT_ANSWER'
+
 export interface AnswerOption {
   id: string
   text: string
@@ -14,6 +20,7 @@ export interface Question {
   id: string
   subjectId: string
   statement: string
+  type: QuestionType
   points: number
   isActive: boolean
   createdAt: string
@@ -23,6 +30,7 @@ export interface Question {
 export interface CreateQuestionBody {
   subjectId: string
   statement: string
+  type?: QuestionType
   points?: number
   options: { text: string; isCorrect: boolean }[]
 }

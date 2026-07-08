@@ -27,6 +27,24 @@ function classify(pct: number): ResultStatus {
   return 'Mauvais';
 }
 
+/** Normalise un texte pour la correction des réponses libres. */
+function normalize(value: string | null | undefined): string {
+  return (value ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[.,;:!?'"()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Égalité ensembliste (mêmes éléments, ordre indifférent). */
+function sameSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const setB = new Set(b);
+  return a.every((x) => setB.has(x));
+}
+
 @Injectable()
 export class ResultsService {
   constructor(
@@ -100,7 +118,11 @@ export class ResultsService {
             question: {
               select: {
                 points: true,
-                options: { where: { isCorrect: true }, select: { id: true } },
+                type: true,
+                options: {
+                  where: { isCorrect: true },
+                  select: { id: true, text: true },
+                },
               },
             },
           },
@@ -110,8 +132,21 @@ export class ResultsService {
     if (!exam) {
       throw new NotFoundException('Évaluation introuvable.');
     }
-    const correctByQuestion = new Map(
-      exam.examQuestions.map((eq) => [eq.questionId, eq.question.options[0]?.id]),
+    // Par question : type, ids des bonnes options, réponses acceptées (texte).
+    const typeByQuestion = new Map(
+      exam.examQuestions.map((eq) => [eq.questionId, eq.question.type]),
+    );
+    const correctIdsByQuestion = new Map(
+      exam.examQuestions.map((eq) => [
+        eq.questionId,
+        eq.question.options.map((o) => o.id),
+      ]),
+    );
+    const acceptedByQuestion = new Map(
+      exam.examQuestions.map((eq) => [
+        eq.questionId,
+        eq.question.options.map((o) => normalize(o.text)),
+      ]),
     );
     // Note maximale = somme des points des questions de l'évaluation.
     const totalPoints = exam.examQuestions.reduce(
@@ -135,7 +170,14 @@ export class ResultsService {
             group: { select: { name: true } },
           },
         },
-        answers: { select: { questionId: true, selectedOptionId: true } },
+        answers: {
+          select: {
+            questionId: true,
+            selectedOptionId: true,
+            selectedOptionIds: true,
+            textAnswer: true,
+          },
+        },
       },
     });
 
@@ -144,9 +186,28 @@ export class ResultsService {
       let incorrectCount = 0;
       let unansweredCount = 0;
       for (const ans of a.answers) {
-        if (!ans.selectedOptionId) unansweredCount++;
-        else if (ans.selectedOptionId === correctByQuestion.get(ans.questionId))
-          correctCount++;
+        const type = typeByQuestion.get(ans.questionId);
+        const correctIds = correctIdsByQuestion.get(ans.questionId) ?? [];
+        let answered: boolean;
+        let correct: boolean;
+        if (type === 'SHORT_ANSWER') {
+          const given = normalize(ans.textAnswer);
+          answered = given.length > 0;
+          correct =
+            answered &&
+            (acceptedByQuestion.get(ans.questionId) ?? []).includes(given);
+        } else if (type === 'MULTIPLE_CHOICE') {
+          const selected = Array.isArray(ans.selectedOptionIds)
+            ? (ans.selectedOptionIds as string[])
+            : [];
+          answered = selected.length > 0;
+          correct = answered && sameSet(selected, correctIds);
+        } else {
+          answered = !!ans.selectedOptionId;
+          correct = answered && ans.selectedOptionId === correctIds[0];
+        }
+        if (!answered) unansweredCount++;
+        else if (correct) correctCount++;
         else incorrectCount++;
       }
       const note = a.score ?? 0; // note = somme des points obtenus

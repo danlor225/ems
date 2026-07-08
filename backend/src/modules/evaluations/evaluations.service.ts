@@ -22,7 +22,7 @@ import { PublishEvaluationDto } from './dto/publish-evaluation.dto';
 import { UpdateEvaluationDto } from './dto/update-evaluation.dto';
 
 const MIN_QUESTIONS = 15;
-const MAX_QUESTIONS = 20;
+const MAX_QUESTIONS = 60;
 
 interface Actor {
   id: string;
@@ -143,7 +143,7 @@ export class EvaluationsService {
     return this.findOne(id);
   }
 
-  /** Publication : contrôle 15–20 questions, crée la Session (fenêtre). */
+  /** Publication : contrôle 15–60 questions, crée la Session (fenêtre). */
   async publish(id: string, dto: PublishEvaluationDto, actor: Actor) {
     const exam = await this.getOwned(id, actor);
     if (exam.status !== 'DRAFT') {

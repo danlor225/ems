@@ -64,6 +64,7 @@ export interface CreateEvaluationBody {
   shuffleAnswers?: boolean
   showResultImmediately?: boolean
   autoGrade?: boolean
+  groupId?: string
   questionIds?: string[]
 }
 
@@ -81,6 +82,8 @@ export interface UpdateEvaluationBody {
   shuffleAnswers?: boolean
   showResultImmediately?: boolean
   autoGrade?: boolean
+  // null => retirer le groupe cible.
+  groupId?: string | null
 }
 
 export interface EvaluationDetails {
@@ -98,6 +101,7 @@ export interface EvaluationDetails {
   shuffleAnswers: boolean
   showResultImmediately: boolean
   autoGrade: boolean
+  groupId: string | null
   subject: { id: string; name: string } | null
   academicSession: { id: string; name: string; academicYear: string } | null
   examQuestions: Array<{ question: { id: string } }>

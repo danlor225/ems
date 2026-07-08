@@ -17,6 +17,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { saveAnswer, startAttempt, submitAttempt } from './examApi'
 
@@ -38,14 +39,21 @@ export function ExamPage() {
     retry: false,
   })
 
-  const [answers, setAnswers] = useState<Record<string, string | null>>({})
+  // Valeur : string (choix unique) ou string[] (choix multiples).
+  const [answers, setAnswers] = useState<
+    Record<string, string | string[] | null>
+  >({})
   const [index, setIndex] = useState(0)
   const [remaining, setRemaining] = useState(0)
   const submittedRef = useRef(false)
 
   const save = useMutation({
-    mutationFn: (v: { questionId: string; optionId: string }) =>
-      saveAnswer(data!.attempt.id, v.questionId, v.optionId),
+    mutationFn: (
+      body:
+        | { questionId: string; selectedOptionId: string }
+        | { questionId: string; selectedOptionIds: string[] }
+        | { questionId: string; text: string },
+    ) => saveAnswer(data!.attempt.id, body),
   })
   const submit = useMutation({
     mutationFn: () => submitAttempt(data!.attempt.id),
@@ -55,8 +63,15 @@ export function ExamPage() {
 
   useEffect(() => {
     if (!data) return
-    const init: Record<string, string | null> = {}
-    data.questions.forEach((q) => (init[q.questionId] = q.selectedOptionId))
+    const init: Record<string, string | string[] | null> = {}
+    data.questions.forEach((q) => {
+      init[q.questionId] =
+        q.type === 'MULTIPLE_CHOICE'
+          ? q.selectedOptionIds
+          : q.type === 'SHORT_ANSWER'
+            ? q.textAnswer
+            : q.selectedOptionId
+    })
     setAnswers(init)
   }, [data])
 
@@ -100,7 +115,9 @@ export function ExamPage() {
   }
 
   const question = data.questions[index]
-  const answeredCount = Object.values(answers).filter(Boolean).length
+  const isAnswered = (v: string | string[] | null | undefined) =>
+    Array.isArray(v) ? v.length > 0 : !!v
+  const answeredCount = Object.values(answers).filter(isAnswered).length
   const timeClass =
     remaining <= 300
       ? 'text-danger'
@@ -108,9 +125,31 @@ export function ExamPage() {
         ? 'text-warning'
         : 'text-foreground'
 
-  function choose(optionId: string) {
+  // Choix unique (SINGLE_CHOICE / TRUE_FALSE).
+  function chooseSingle(optionId: string) {
     setAnswers((prev) => ({ ...prev, [question.questionId]: optionId }))
-    save.mutate({ questionId: question.questionId, optionId })
+    save.mutate({ questionId: question.questionId, selectedOptionId: optionId })
+  }
+  // Choix multiples (MULTIPLE_CHOICE) : bascule l'option.
+  function toggleMulti(optionId: string) {
+    const current = answers[question.questionId]
+    const cur = Array.isArray(current) ? current : []
+    const next = cur.includes(optionId)
+      ? cur.filter((x) => x !== optionId)
+      : [...cur, optionId]
+    setAnswers((prev) => ({ ...prev, [question.questionId]: next }))
+    save.mutate({ questionId: question.questionId, selectedOptionIds: next })
+  }
+  // Réponse libre (SHORT_ANSWER) : saisie locale, sauvegarde à la perte de focus.
+  function setText(value: string) {
+    setAnswers((prev) => ({ ...prev, [question.questionId]: value }))
+  }
+  function saveText() {
+    const v = answers[question.questionId]
+    save.mutate({
+      questionId: question.questionId,
+      text: typeof v === 'string' ? v : '',
+    })
   }
   function doSubmit() {
     if (submittedRef.current) return
@@ -159,16 +198,45 @@ export function ExamPage() {
             transition={{ duration: 0.2, ease: EASE }}
           >
             <Card className="p-6">
-              <Badge variant="info" className="mb-3">
-                {question.points} point{question.points > 1 ? 's' : ''}
-              </Badge>
+              <div className="mb-3 flex items-center gap-2">
+                <Badge variant="info">
+                  {question.points} point{question.points > 1 ? 's' : ''}
+                </Badge>
+                {question.type === 'MULTIPLE_CHOICE' && (
+                  <span className="text-xs font-medium text-info">
+                    Plusieurs réponses possibles
+                  </span>
+                )}
+                {question.type === 'SHORT_ANSWER' && (
+                  <span className="text-xs font-medium text-info">
+                    Réponse libre
+                  </span>
+                )}
+              </div>
               <p className="mb-5 text-lg font-semibold text-foreground">
                 {question.statement}
               </p>
 
+              {question.type === 'SHORT_ANSWER' ? (
+                <Textarea
+                  rows={3}
+                  placeholder="Saisissez votre réponse…"
+                  value={
+                    typeof answers[question.questionId] === 'string'
+                      ? (answers[question.questionId] as string)
+                      : ''
+                  }
+                  onChange={(e) => setText(e.target.value)}
+                  onBlur={saveText}
+                />
+              ) : (
               <div className="space-y-3">
                 {question.options.map((opt, i) => {
-                  const selected = answers[question.questionId] === opt.id
+                  const isMulti = question.type === 'MULTIPLE_CHOICE'
+                  const current = answers[question.questionId]
+                  const selected = isMulti
+                    ? Array.isArray(current) && current.includes(opt.id)
+                    : current === opt.id
                   return (
                     <label
                       key={opt.id}
@@ -180,11 +248,16 @@ export function ExamPage() {
                       )}
                     >
                       <input
-                        type="radio"
+                        type={isMulti ? 'checkbox' : 'radio'}
                         name={question.questionId}
                         checked={selected}
-                        onChange={() => choose(opt.id)}
-                        className="size-4 accent-primary"
+                        onChange={() =>
+                          isMulti ? toggleMulti(opt.id) : chooseSingle(opt.id)
+                        }
+                        className={cn(
+                          'size-4 accent-primary',
+                          isMulti && 'rounded',
+                        )}
                       />
                       <span className="font-medium text-muted-foreground">
                         {String.fromCharCode(65 + i)}.
@@ -194,6 +267,7 @@ export function ExamPage() {
                   )
                 })}
               </div>
+              )}
             </Card>
           </motion.div>
         </AnimatePresence>
@@ -240,7 +314,7 @@ export function ExamPage() {
                   'grid size-9 place-items-center rounded-lg text-sm font-medium transition-colors',
                   i === index
                     ? 'bg-primary text-primary-foreground'
-                    : answers[q.questionId]
+                    : isAnswered(answers[q.questionId])
                       ? 'bg-success/15 text-success'
                       : 'bg-muted text-muted-foreground hover:bg-muted/70',
                 )}

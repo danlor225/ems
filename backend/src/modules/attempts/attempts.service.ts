@@ -33,7 +33,14 @@ type AttemptForResult = Prisma.AttemptGetPayload<{
     };
     session: {
       include: {
-        exam: { select: { title: true; passScore: true; durationMinutes: true } };
+        exam: {
+          select: {
+            title: true;
+            passScore: true;
+            durationMinutes: true;
+            showResultImmediately: true;
+          };
+        };
       };
     };
   };
@@ -47,6 +54,32 @@ function shuffle<T>(input: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+/** Égalité ensembliste (mêmes éléments, ordre indifférent, valeurs uniques). */
+function sameSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const setB = new Set(b);
+  return a.every((x) => setB.has(x));
+}
+
+/** Lit un champ Json d'ids en tableau de chaînes (tolère null). */
+function asIdArray(value: unknown): string[] {
+  return Array.isArray(value) ? (value as string[]) : [];
+}
+
+/**
+ * Normalise un texte pour la correction des réponses libres :
+ * minuscules, espaces réduits, accents retirés, ponctuation de bord.
+ */
+function normalizeText(value: string | null | undefined): string {
+  return (value ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // diacritiques (accents)
+    .toLowerCase()
+    .replace(/[.,;:!?'"()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 @Injectable()
@@ -129,27 +162,85 @@ export class AttemptsService {
       throw new BadRequestException("Cette question ne fait pas partie de la tentative.");
     }
 
-    // L'option choisie doit appartenir à la question (elle est dans optionOrder).
-    const optionOrder = answer.optionOrder as unknown as string[];
-    if (!optionOrder.includes(dto.selectedOptionId)) {
-      throw new BadRequestException('Option invalide pour cette question.');
+    // Le type détermine la forme attendue de la réponse.
+    const question = await this.prisma.question.findUnique({
+      where: { id: dto.questionId },
+      select: { type: true },
+    });
+    if (!question) {
+      throw new BadRequestException('Question introuvable.');
     }
 
-    await this.prisma.attemptAnswer.update({
-      where: {
-        attemptId_questionId: { attemptId, questionId: dto.questionId },
-      },
-      data: { selectedOptionId: dto.selectedOptionId, answeredAt: new Date() },
-    });
-
+    // Les options choisies doivent appartenir à la question (dans optionOrder).
+    const optionOrder = answer.optionOrder as unknown as string[];
     const remainingSeconds = Math.max(
       0,
       Math.floor((attempt.expiresAt.getTime() - Date.now()) / 1000),
     );
+
+    if (question.type === 'SHORT_ANSWER') {
+      const text = (dto.text ?? '').trim();
+      await this.prisma.attemptAnswer.update({
+        where: {
+          attemptId_questionId: { attemptId, questionId: dto.questionId },
+        },
+        data: {
+          textAnswer: text.length > 0 ? text : null,
+          selectedOptionId: null,
+          selectedOptionIds: Prisma.DbNull,
+          answeredAt: new Date(),
+        },
+      });
+      return {
+        saved: true,
+        questionId: dto.questionId,
+        text,
+        remainingSeconds,
+      };
+    }
+
+    if (question.type === 'MULTIPLE_CHOICE') {
+      const selected = dto.selectedOptionIds ?? [];
+      if (selected.some((id) => !optionOrder.includes(id))) {
+        throw new BadRequestException('Option invalide pour cette question.');
+      }
+      await this.prisma.attemptAnswer.update({
+        where: {
+          attemptId_questionId: { attemptId, questionId: dto.questionId },
+        },
+        data: {
+          selectedOptionIds: selected,
+          selectedOptionId: null, // exclusif du multi
+          answeredAt: new Date(),
+        },
+      });
+      return {
+        saved: true,
+        questionId: dto.questionId,
+        selectedOptionIds: selected,
+        remainingSeconds,
+      };
+    }
+
+    // SINGLE_CHOICE / TRUE_FALSE : une seule option, requise et valide.
+    const selectedOptionId = dto.selectedOptionId;
+    if (!selectedOptionId || !optionOrder.includes(selectedOptionId)) {
+      throw new BadRequestException('Option invalide pour cette question.');
+    }
+    await this.prisma.attemptAnswer.update({
+      where: {
+        attemptId_questionId: { attemptId, questionId: dto.questionId },
+      },
+      data: {
+        selectedOptionId,
+        selectedOptionIds: Prisma.DbNull, // exclusif du choix unique
+        answeredAt: new Date(),
+      },
+    });
     return {
       saved: true,
       questionId: dto.questionId,
-      selectedOptionId: dto.selectedOptionId,
+      selectedOptionId,
       remainingSeconds,
     };
   }
@@ -176,20 +267,42 @@ export class AttemptsService {
       select: {
         id: true,
         points: true,
-        options: { where: { isCorrect: true }, select: { id: true } },
+        type: true,
+        options: { where: { isCorrect: true }, select: { id: true, text: true } },
       },
     });
-    const correctOptionByQuestion = new Map(
-      questions.map((q) => [q.id, q.options[0]?.id]),
+    // Toutes les bonnes options par question (une seule pour choix unique).
+    const correctIdsByQuestion = new Map(
+      questions.map((q) => [q.id, q.options.map((o) => o.id)]),
     );
+    // Réponses acceptées (normalisées) pour les réponses libres.
+    const acceptedByQuestion = new Map(
+      questions.map((q) => [q.id, q.options.map((o) => normalizeText(o.text))]),
+    );
+    const typeByQuestion = new Map(questions.map((q) => [q.id, q.type]));
     const pointsByQuestion = new Map(questions.map((q) => [q.id, q.points]));
 
     let earned = 0;
     for (const answer of attempt.answers) {
       const points = pointsByQuestion.get(answer.questionId) ?? 0;
-      if (
+      const correctIds = correctIdsByQuestion.get(answer.questionId) ?? [];
+      const type = typeByQuestion.get(answer.questionId);
+      if (type === 'SHORT_ANSWER') {
+        // Correspondance normalisée avec une réponse acceptée.
+        const given = normalizeText(answer.textAnswer);
+        const accepted = acceptedByQuestion.get(answer.questionId) ?? [];
+        if (given.length > 0 && accepted.includes(given)) {
+          earned += points;
+        }
+      } else if (type === 'MULTIPLE_CHOICE') {
+        // Tout ou rien : l'ensemble coché doit correspondre EXACTEMENT.
+        const selected = asIdArray(answer.selectedOptionIds);
+        if (selected.length > 0 && sameSet(selected, correctIds)) {
+          earned += points;
+        }
+      } else if (
         answer.selectedOptionId &&
-        answer.selectedOptionId === correctOptionByQuestion.get(answer.questionId)
+        answer.selectedOptionId === correctIds[0]
       ) {
         earned += points;
       }
@@ -225,7 +338,22 @@ export class AttemptsService {
         "Résultat indisponible : l'évaluation n'est pas encore soumise.",
       );
     }
-    return this.buildResult(attempt);
+    // Intégrité : si l'enseignant a désactivé l'affichage immédiat, l'étudiant
+    // ne voit NI sa note NI la correction (juste une confirmation). Le staff,
+    // lui, passe par getResultForStaff (non affecté).
+    if (!attempt.session.exam.showResultImmediately) {
+      return {
+        hidden: true as const,
+        attempt: {
+          id: attempt.id,
+          status: attempt.status,
+          submittedAt: attempt.submittedAt,
+        },
+        exam: { title: attempt.session.exam.title },
+      };
+    }
+    const result = await this.buildResult(attempt);
+    return { hidden: false as const, ...result };
   }
 
   /** Résultat détaillé pour le STAFF (enseignant/admin), sans ownership. */
@@ -252,7 +380,12 @@ export class AttemptsService {
         session: {
           include: {
             exam: {
-              select: { title: true, passScore: true, durationMinutes: true },
+              select: {
+                title: true,
+                passScore: true,
+                durationMinutes: true,
+                showResultImmediately: true,
+              },
             },
           },
         },
@@ -278,17 +411,61 @@ export class AttemptsService {
       const answer = answerByQuestion.get(questionId)!;
       const optionOrder = answer.optionOrder as unknown as string[];
       const optionById = new Map(question.options.map((o) => [o.id, o]));
-      const correctOption = question.options.find((o) => o.isCorrect);
+      const correctIds = question.options
+        .filter((o) => o.isCorrect)
+        .map((o) => o.id);
+
+      const isShort = question.type === 'SHORT_ANSWER';
+      const isMultiple = question.type === 'MULTIPLE_CHOICE';
+
+      // Réponse libre : réponses acceptées (tous les libellés) + correspondance.
+      const acceptedAnswers = isShort
+        ? question.options.map((o) => o.text)
+        : [];
+      if (isShort) {
+        const given = normalizeText(answer.textAnswer);
+        const isCorrect =
+          given.length > 0 &&
+          acceptedAnswers.map((t) => normalizeText(t)).includes(given);
+        return {
+          questionId,
+          type: question.type,
+          statement: question.statement,
+          points: question.points,
+          selectedOptionId: null,
+          correctOptionId: null,
+          selectedOptionIds: [],
+          correctOptionIds: [],
+          textAnswer: answer.textAnswer,
+          acceptedAnswers,
+          isCorrect,
+          options: [] as { id: string; text: string; isCorrect: boolean }[],
+        };
+      }
+
+      const selectedIds = isMultiple
+        ? asIdArray(answer.selectedOptionIds)
+        : answer.selectedOptionId
+          ? [answer.selectedOptionId]
+          : [];
+      const isCorrect = isMultiple
+        ? selectedIds.length > 0 && sameSet(selectedIds, correctIds)
+        : selectedIds.length === 1 && selectedIds[0] === correctIds[0];
 
       return {
         questionId,
+        type: question.type,
         statement: question.statement,
         points: question.points,
+        // Champs "choix unique" conservés pour compatibilité de l'UI existante.
         selectedOptionId: answer.selectedOptionId,
-        correctOptionId: correctOption?.id ?? null,
-        isCorrect:
-          !!answer.selectedOptionId &&
-          answer.selectedOptionId === correctOption?.id,
+        correctOptionId: isMultiple ? null : (correctIds[0] ?? null),
+        // Champs "multi" (tableaux) pour les QCM à réponses multiples.
+        selectedOptionIds: selectedIds,
+        correctOptionIds: correctIds,
+        textAnswer: null as string | null,
+        acceptedAnswers,
+        isCorrect,
         options: optionOrder.map((optionId) => {
           const o = optionById.get(optionId)!;
           return { id: o.id, text: o.text, isCorrect: o.isCorrect };
@@ -333,6 +510,7 @@ export class AttemptsService {
               select: {
                 title: true,
                 passScore: true,
+                showResultImmediately: true,
                 examQuestions: {
                   select: { question: { select: { points: true } } },
                 },
@@ -350,13 +528,16 @@ export class AttemptsService {
       );
       const percentage =
         a.score !== null && totalPoints > 0 ? (a.score / totalPoints) * 100 : 0;
+      // Si l'affichage immédiat est désactivé, on masque la note/réussite.
+      const hidden = !a.session.exam.showResultImmediately;
       return {
         attemptId: a.id,
         sessionId: a.sessionId,
         examTitle: a.session.exam.title,
-        score: a.score, // points
+        resultsHidden: hidden,
+        score: hidden ? null : a.score, // points
         totalPoints,
-        passed: percentage >= a.session.exam.passScore,
+        passed: hidden ? null : percentage >= a.session.exam.passScore,
         status: a.status,
         submittedAt: a.submittedAt,
       };
@@ -421,17 +602,25 @@ export class AttemptsService {
       const answer = answerByQuestionId.get(questionId)!;
       const optionOrder = answer.optionOrder as unknown as string[];
       const optionById = new Map(question.options.map((o) => [o.id, o]));
+      const isShort = question.type === 'SHORT_ANSWER';
 
       return {
         questionId,
+        type: question.type,
         statement: question.statement,
         points: question.points,
         selectedOptionId: answer.selectedOptionId,
-        // On n'expose QUE id + text : jamais isCorrect.
-        options: optionOrder.map((optionId) => {
-          const option = optionById.get(optionId)!;
-          return { id: option.id, text: option.text };
-        }),
+        selectedOptionIds: asIdArray(answer.selectedOptionIds),
+        // Réponse libre déjà saisie (reprise). Aucune option n'est exposée :
+        // les "options" d'une réponse libre SONT les réponses acceptées.
+        textAnswer: isShort ? (answer.textAnswer ?? '') : null,
+        options: isShort
+          ? []
+          : optionOrder.map((optionId) => {
+              const option = optionById.get(optionId)!;
+              // On n'expose QUE id + text : jamais isCorrect.
+              return { id: option.id, text: option.text };
+            }),
       };
     });
 

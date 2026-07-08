@@ -15,7 +15,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
-import { getSubjects } from '../subjects/subjectsApi'
+import { Modal } from '@/components/ui/modal'
+import { createSubject, getSubjects } from '../subjects/subjectsApi'
 import {
   createQuestion,
   deleteQuestion,
@@ -23,32 +24,84 @@ import {
   updateQuestion,
 } from './questionsApi'
 
+const TYPE_LABELS: Record<string, string> = {
+  SINGLE_CHOICE: 'Choix unique',
+  TRUE_FALSE: 'Vrai / Faux',
+  MULTIPLE_CHOICE: 'Choix multiples',
+  SHORT_ANSWER: 'Réponse libre',
+}
+
 const schema = z
   .object({
     subjectId: z.string().uuid('Choisissez une matière.'),
     statement: z.string().min(1, "L'énoncé est requis."),
+    type: z.enum([
+      'SINGLE_CHOICE',
+      'TRUE_FALSE',
+      'MULTIPLE_CHOICE',
+      'SHORT_ANSWER',
+    ]),
     points: z.number().int().min(1),
-    correctIndex: z.number().int().min(0),
     options: z
-      .array(z.object({ text: z.string().min(1, 'Texte requis.') }))
-      .min(2, 'Au moins 2 réponses.'),
+      .array(
+        z.object({
+          text: z.string().min(1, 'Texte requis.'),
+          isCorrect: z.boolean(),
+        }),
+      )
+      .min(1, 'Au moins une réponse.'),
   })
-  .refine((v) => v.correctIndex < v.options.length, {
-    message: 'La bonne réponse doit correspondre à une option.',
-    path: ['correctIndex'],
+  // Nombre minimum d'options selon le type.
+  .refine(
+    (v) => (v.type === 'SHORT_ANSWER' ? v.options.length >= 1 : v.options.length >= 2),
+    { message: 'Une question à choix doit avoir au moins 2 réponses.', path: ['options'] },
+  )
+  // Nombre de bonnes réponses (non applicable à la réponse libre).
+  .refine(
+    (v) => {
+      if (v.type === 'SHORT_ANSWER') return true
+      const correct = v.options.filter((o) => o.isCorrect).length
+      return v.type === 'MULTIPLE_CHOICE' ? correct >= 1 : correct === 1
+    },
+    {
+      message: 'Sélectionnez la (ou les) bonne(s) réponse(s).',
+      path: ['options'],
+    },
+  )
+  .refine((v) => v.type !== 'TRUE_FALSE' || v.options.length === 2, {
+    message: 'Une question Vrai/Faux doit avoir exactement deux options.',
+    path: ['options'],
   })
+
 type FormValues = z.infer<typeof schema>
+
+const subjectSchema = z.object({
+  name: z.string().min(1, 'Le nom est requis.').max(150),
+  description: z.string().max(1000).optional(),
+})
 
 export function QuestionsPage() {
   const queryClient = useQueryClient()
   const [subjectFilter, setSubjectFilter] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
+  const [subjectError, setSubjectError] = useState<string | null>(null)
+  const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false)
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null)
   const formSectionRef = useRef<HTMLDivElement>(null)
 
   const { data: subjects } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => getSubjects(),
+  })
+
+  const {
+    register: registerSubject,
+    handleSubmit: handleSubmitSubject,
+    reset: resetSubject,
+    formState: { errors: subjectErrors },
+  } = useForm<z.infer<typeof subjectSchema>>({
+    resolver: zodResolver(subjectSchema),
+    defaultValues: { name: '', description: '' },
   })
   const subjectName = (id: string) =>
     subjects?.data.find((s) => s.id === id)?.name ?? '—'
@@ -64,29 +117,67 @@ export function QuestionsPage() {
     control,
     reset,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+      type: 'SINGLE_CHOICE',
       points: 1,
-      correctIndex: 0,
-      options: [{ text: '' }, { text: '' }],
+      options: [
+        { text: '', isCorrect: true },
+        { text: '', isCorrect: false },
+      ],
     },
   })
-  const { fields, append, remove: removeOption } = useFieldArray({
-    control,
-    name: 'options',
-  })
+  const {
+    fields,
+    append,
+    remove: removeOption,
+    replace,
+  } = useFieldArray({ control, name: 'options' })
+
+  const type = watch('type')
+  const options = watch('options')
+  const isMulti = type === 'MULTIPLE_CHOICE'
+  const isTrueFalse = type === 'TRUE_FALSE'
+  const isShort = type === 'SHORT_ANSWER'
+
+  // Changement de type : on ajuste les options en conséquence.
+  function onTypeChange(next: FormValues['type']) {
+    setValue('type', next)
+    if (next === 'TRUE_FALSE') {
+      replace([
+        { text: 'Vrai', isCorrect: true },
+        { text: 'Faux', isCorrect: false },
+      ])
+    } else if (next === 'SHORT_ANSWER') {
+      // Réponse libre : une réponse acceptée au départ (toutes "correctes").
+      replace([{ text: '', isCorrect: true }])
+    } else if (type === 'TRUE_FALSE' || type === 'SHORT_ANSWER') {
+      // On quittait Vrai/Faux ou réponse libre : deux options vierges.
+      replace([
+        { text: '', isCorrect: true },
+        { text: '', isCorrect: false },
+      ])
+    }
+  }
+
+  // Choix unique / Vrai-Faux : une seule bonne réponse (exclusif).
+  function setSingleCorrect(index: number) {
+    options.forEach((_, i) => setValue(`options.${i}.isCorrect`, i === index))
+  }
 
   const create = useMutation({
     mutationFn: (v: FormValues) =>
       createQuestion({
         subjectId: v.subjectId,
         statement: v.statement,
+        type: v.type,
         points: v.points,
-        options: v.options.map((o, i) => ({
+        options: v.options.map((o) => ({
           text: o.text,
-          isCorrect: i === v.correctIndex,
+          isCorrect: o.isCorrect,
         })),
       }),
     onSuccess: () => {
@@ -104,9 +195,9 @@ export function QuestionsPage() {
         subjectId: v.subjectId,
         statement: v.statement,
         points: v.points,
-        options: v.options.map((o, i) => ({
+        options: v.options.map((o) => ({
           text: o.text,
-          isCorrect: i === v.correctIndex,
+          isCorrect: o.isCorrect,
         })),
       }),
     onSuccess: () => {
@@ -129,11 +220,37 @@ export function QuestionsPage() {
       ),
   })
 
+  const createSubjectMutation = useMutation({
+    mutationFn: (v: z.infer<typeof subjectSchema>) =>
+      createSubject({ name: v.name, description: v.description || undefined }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subjects'] })
+      resetSubject()
+      setSubjectError(null)
+      setIsSubjectModalOpen(false)
+    },
+    onError: () => setSubjectError('Erreur lors de la création de la matière.'),
+  })
+
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-bold tracking-tight text-foreground">
-        Questions
-      </h1>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <h1 className="text-xl font-bold tracking-tight text-foreground">
+          Questions
+        </h1>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            setSubjectError(null)
+            resetSubject()
+            setIsSubjectModalOpen(true)
+          }}
+        >
+          <Plus className="size-4" />
+          Nouvelle matière
+        </Button>
+      </div>
 
       {/* Création */}
       <div ref={formSectionRef}>
@@ -146,7 +263,7 @@ export function QuestionsPage() {
             onSubmit={handleSubmit((v) => (editingQuestionId ? update.mutate(v) : create.mutate(v)))}
             className="space-y-4"
           >
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
               <div className="space-y-1.5 md:col-span-2">
                 <Label htmlFor="subjectId">Matière</Label>
                 <NativeSelect
@@ -169,6 +286,22 @@ export function QuestionsPage() {
                     {errors.subjectId.message}
                   </p>
                 )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="type">Type</Label>
+                <NativeSelect
+                  id="type"
+                  value={type}
+                  onChange={(e) =>
+                    onTypeChange(e.target.value as FormValues['type'])
+                  }
+                  disabled={!!editingQuestionId}
+                >
+                  <option value="SINGLE_CHOICE">Choix unique</option>
+                  <option value="TRUE_FALSE">Vrai / Faux</option>
+                  <option value="MULTIPLE_CHOICE">Choix multiples</option>
+                  <option value="SHORT_ANSWER">Réponse libre</option>
+                </NativeSelect>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="points">Points</Label>
@@ -198,22 +331,41 @@ export function QuestionsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Réponses (cochez la bonne)</Label>
+              <Label>
+                {isShort
+                  ? 'Réponses acceptées (toute correspondance vaut juste)'
+                  : isMulti
+                    ? 'Réponses (cochez toutes les bonnes)'
+                    : 'Réponses (cochez la bonne)'}
+              </Label>
               {fields.map((field, index) => (
                 <div key={field.id} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    value={index}
-                    aria-label={`Bonne réponse : option ${index + 1}`}
-                    {...register('correctIndex', { valueAsNumber: true })}
-                    className="size-4 accent-primary"
-                  />
+                  {isShort ? null : isMulti ? (
+                    <input
+                      type="checkbox"
+                      aria-label={`Bonne réponse : option ${index + 1}`}
+                      {...register(`options.${index}.isCorrect`)}
+                      className="size-4 rounded accent-primary"
+                    />
+                  ) : (
+                    <input
+                      type="radio"
+                      name="correct-option"
+                      aria-label={`Bonne réponse : option ${index + 1}`}
+                      checked={!!options[index]?.isCorrect}
+                      onChange={() => setSingleCorrect(index)}
+                      className="size-4 accent-primary"
+                    />
+                  )}
                   <Input
                     className="flex-1"
-                    placeholder={`Réponse ${index + 1}`}
+                    placeholder={
+                      isShort ? `Réponse acceptée ${index + 1}` : `Réponse ${index + 1}`
+                    }
+                    readOnly={isTrueFalse}
                     {...register(`options.${index}.text`)}
                   />
-                  {fields.length > 2 && (
+                  {!isTrueFalse && fields.length > (isShort ? 1 : 2) && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -227,23 +379,23 @@ export function QuestionsPage() {
                   )}
                 </div>
               ))}
-              {(errors.options || errors.correctIndex) && (
+              {errors.options && (
                 <p className="text-xs text-danger">
-                  {errors.options?.message ??
-                    errors.options?.root?.message ??
-                    errors.correctIndex?.message}
+                  {errors.options.message ?? errors.options.root?.message}
                 </p>
               )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => append({ text: '' })}
-                className="text-primary"
-              >
-                <Plus className="size-4" />
-                Ajouter une réponse
-              </Button>
+              {!isTrueFalse && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => append({ text: '', isCorrect: isShort })}
+                  className="text-primary"
+                >
+                  <Plus className="size-4" />
+                  {isShort ? 'Ajouter une réponse acceptée' : 'Ajouter une réponse'}
+                </Button>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -277,6 +429,64 @@ export function QuestionsPage() {
           {actionError}
         </div>
       )}
+
+      <Modal
+        open={isSubjectModalOpen}
+        onClose={() => setIsSubjectModalOpen(false)}
+        title="Nouvelle matière"
+        description="Créez une matière directement depuis la banque de questions."
+      >
+        <form
+          onSubmit={handleSubmitSubject((v) => createSubjectMutation.mutate(v))}
+          className="space-y-4"
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="subject-name">Nom</Label>
+            <Input
+              id="subject-name"
+              placeholder="Nom de la matière"
+              {...registerSubject('name')}
+              aria-invalid={!!subjectErrors.name}
+            />
+            {subjectErrors.name && (
+              <p className="text-xs text-danger">
+                {subjectErrors.name.message}
+              </p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="subject-description">Description</Label>
+            <Textarea
+              id="subject-description"
+              rows={3}
+              placeholder="Description (optionnelle)"
+              {...registerSubject('description')}
+            />
+            {subjectErrors.description && (
+              <p className="text-xs text-danger">
+                {subjectErrors.description.message}
+              </p>
+            )}
+          </div>
+          {subjectError && (
+            <div className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+              {subjectError}
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setIsSubjectModalOpen(false)}
+            >
+              Annuler
+            </Button>
+            <Button type="submit" loading={createSubjectMutation.isPending}>
+              Créer la matière
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Filtre + liste */}
       <div className="flex items-center gap-2">
@@ -318,8 +528,9 @@ export function QuestionsPage() {
                 <div>
                   <p className="font-medium text-foreground">{q.statement}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {subjectName(q.subjectId)} · {q.options.length} réponses ·{' '}
-                    {q.points} pt{q.points > 1 ? 's' : ''}
+                    {subjectName(q.subjectId)} · {TYPE_LABELS[q.type] ?? q.type}{' '}
+                    · {q.options.length} réponses · {q.points} pt
+                    {q.points > 1 ? 's' : ''}
                     {!q.isActive && ' · désactivée'}
                   </p>
                 </div>
@@ -332,10 +543,15 @@ export function QuestionsPage() {
                       setEditingQuestionId(q.id)
                       setValue('subjectId', q.subjectId)
                       setValue('statement', q.statement)
+                      setValue('type', q.type)
                       setValue('points', q.points)
-                      const correctIndex = q.options.findIndex((o) => o.isCorrect)
-                      setValue('correctIndex', correctIndex >= 0 ? correctIndex : 0)
-                      setValue('options', q.options.map((o) => ({ text: o.text })))
+                      setValue(
+                        'options',
+                        q.options.map((o) => ({
+                          text: o.text,
+                          isCorrect: o.isCorrect,
+                        })),
+                      )
                       setActionError(null)
                       requestAnimationFrame(() => {
                         formSectionRef.current?.scrollIntoView({

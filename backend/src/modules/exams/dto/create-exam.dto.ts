@@ -1,6 +1,6 @@
 // ============================================================
 //  CreateExamDto : un examen (modèle) + sa composition de questions.
-//  On limite la composition à 20 max ici ; le minimum de 15 est
+//  On limite la composition à 60 max ici ; le minimum de 15 est
 //  contrôlé à la PUBLICATION (on peut construire un brouillon).
 // ============================================================
 import {
@@ -38,7 +38,7 @@ export class CreateExamDto {
 
   @IsArray()
   @ArrayMinSize(1, { message: 'Ajoutez au moins une question.' })
-  @ArrayMaxSize(20, { message: 'Un examen ne peut dépasser 20 questions.' })
+  @ArrayMaxSize(60, { message: 'Un examen ne peut dépasser 60 questions.' })
   @IsUUID(undefined, { each: true })
   questionIds: string[];
 }

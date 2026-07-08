@@ -29,7 +29,10 @@ enum Role {
 }
 
 enum QuestionType {
-  SINGLE_CHOICE // QCM à réponse unique (extensible plus tard)
+  SINGLE_CHOICE   // QCM à réponse unique
+  TRUE_FALSE      // Vrai / Faux (choix unique à 2 options)
+  MULTIPLE_CHOICE // QCM à réponses multiples (plusieurs bonnes options)
+  SHORT_ANSWER    // Réponse libre (texte) corrigée par correspondance
 }
 
 enum SessionStatus {
@@ -300,7 +303,9 @@ model AttemptAnswer {
   id               String   @id @default(uuid()) @db.Uuid
   attemptId        String   @map("attempt_id") @db.Uuid
   questionId       String   @map("question_id") @db.Uuid
-  selectedOptionId String?  @map("selected_option_id") @db.Uuid // null tant que pas répondu
+  selectedOptionId String?  @map("selected_option_id") @db.Uuid // choix unique (SINGLE_CHOICE / TRUE_FALSE)
+  selectedOptionIds Json?   @map("selected_option_ids") // choix multiples (MULTIPLE_CHOICE) : tableau d'ids
+  textAnswer       String?  @map("text_answer") // réponse libre (SHORT_ANSWER)
   optionOrder      Json     @map("option_order") // ordre aléatoire des réponses, FIGÉ par tentative
   answeredAt       DateTime @default(now()) @map("answered_at")
 

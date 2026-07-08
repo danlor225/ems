@@ -23,9 +23,10 @@ export interface MyAttempt {
   attemptId: string
   sessionId?: string
   examTitle: string
+  resultsHidden: boolean
   score: number | null
   totalPoints: number
-  passed: boolean
+  passed: boolean | null
   status: string
   submittedAt?: string | null
 }

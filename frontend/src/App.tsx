@@ -1,7 +1,6 @@
 import { Loader2 } from 'lucide-react'
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { ComingSoon } from './components/ComingSoon'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
 // ------------------------------------------------------------
@@ -69,6 +68,11 @@ const CertificatesPage = lazy(() =>
 const CertificateVerifyPage = lazy(() =>
   import('./features/certificates/CertificateVerifyPage').then((m) => ({
     default: m.CertificateVerifyPage,
+  })),
+)
+const ReportsPage = lazy(() =>
+  import('./features/reports/ReportsPage').then((m) => ({
+    default: m.ReportsPage,
   })),
 )
 const CreateExamWizard = lazy(() =>
@@ -151,11 +155,8 @@ export default function App() {
           {/* v2 : module Certificats */}
           <Route path="/admin/certificats" element={<CertificatesPage />} />
 
-          {/* Modules à venir */}
-          <Route
-            path="/admin/rapports"
-            element={<ComingSoon title="Rapports" />}
-          />
+          {/* v2 : module Rapports */}
+          <Route path="/admin/rapports" element={<ReportsPage />} />
         </Route>
 
         {/* Coquille strictement ADMIN */}

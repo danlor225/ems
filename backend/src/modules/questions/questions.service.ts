@@ -7,7 +7,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, QuestionType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SubjectsService } from '../subjects/subjects.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
@@ -22,12 +22,52 @@ export class QuestionsService {
     private readonly subjectsService: SubjectsService,
   ) {}
 
-  /** Règle métier : une question a EXACTEMENT une bonne réponse. */
-  private ensureExactlyOneCorrect(options: { isCorrect: boolean }[]): void {
+  /**
+   * Règles métier selon le type de question :
+   *  - SINGLE_CHOICE / TRUE_FALSE : EXACTEMENT une bonne réponse.
+   *  - TRUE_FALSE : en plus, EXACTEMENT deux options (Vrai / Faux).
+   *  - MULTIPLE_CHOICE : AU MOINS une bonne réponse (et pas toutes fausses).
+   */
+  private validateOptions(
+    type: QuestionType,
+    options: { text: string; isCorrect: boolean }[],
+  ): void {
+    // Réponse libre : ≥1 réponse acceptée (chaque option = un libellé accepté).
+    if (type === 'SHORT_ANSWER') {
+      if (options.length < 1) {
+        throw new BadRequestException(
+          'Une réponse libre doit avoir au moins une réponse acceptée.',
+        );
+      }
+      return;
+    }
+
+    // Les types à choix exigent au moins 2 options.
+    if (options.length < 2) {
+      throw new BadRequestException(
+        'Une question à choix doit avoir au moins 2 réponses.',
+      );
+    }
+
     const correctCount = options.filter((o) => o.isCorrect).length;
+    if (type === 'MULTIPLE_CHOICE') {
+      if (correctCount < 1) {
+        throw new BadRequestException(
+          'Un QCM à réponses multiples doit avoir au moins une bonne réponse.',
+        );
+      }
+      return;
+    }
+
+    // SINGLE_CHOICE et TRUE_FALSE : exactement une bonne réponse.
     if (correctCount !== 1) {
       throw new BadRequestException(
-        'Une question doit avoir exactement une bonne réponse.',
+        'Une question à choix unique doit avoir exactement une bonne réponse.',
+      );
+    }
+    if (type === 'TRUE_FALSE' && options.length !== 2) {
+      throw new BadRequestException(
+        'Une question Vrai/Faux doit avoir exactement deux options.',
       );
     }
   }
@@ -35,18 +75,21 @@ export class QuestionsService {
   /** Crée une question et ses options en une seule transaction. */
   async create(dto: CreateQuestionDto) {
     await this.subjectsService.findOne(dto.subjectId); // 404 si matière absente
-    this.ensureExactlyOneCorrect(dto.options);
+    const type = dto.type ?? 'SINGLE_CHOICE';
+    this.validateOptions(type, dto.options);
 
     return this.prisma.question.create({
       data: {
         subjectId: dto.subjectId,
         statement: dto.statement,
+        type,
         points: dto.points ?? 1,
         // create imbriqué : Prisma insère la question ET ses options atomiquement.
+        // Réponse libre : chaque option est une réponse acceptée (isCorrect=true).
         options: {
           create: dto.options.map((o) => ({
             text: o.text,
-            isCorrect: o.isCorrect,
+            isCorrect: type === 'SHORT_ANSWER' ? true : o.isCorrect,
           })),
         },
       },

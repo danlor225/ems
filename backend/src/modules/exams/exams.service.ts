@@ -18,7 +18,7 @@ import { UpdateExamDto } from './dto/update-exam.dto';
 
 // Bornes imposées par le cahier des charges (contrôlées à la publication).
 const MIN_QUESTIONS = 15;
-const MAX_QUESTIONS = 20;
+const MAX_QUESTIONS = 60;
 
 @Injectable()
 export class ExamsService {
@@ -122,7 +122,7 @@ export class ExamsService {
     return this.prisma.exam.update({ where: { id }, data: dto });
   }
 
-  /** Publication : vérifie le nombre de questions (15–20) et leur activité. */
+  /** Publication : vérifie le nombre de questions (15–60) et leur activité. */
   async publish(id: string, actorId: string) {
     const exam = await this.prisma.exam.findUnique({
       where: { id },

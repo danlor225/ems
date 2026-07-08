@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { getGroups } from '../groups/groupsApi'
 import { getQuestions } from '../questions/questionsApi'
 import { getSubjects } from '../subjects/subjectsApi'
 import {
@@ -35,7 +36,7 @@ import {
 const EASE = [0.16, 1, 0.3, 1] as const
 const STEPS = ['Session', 'Configuration', 'Questions', 'Publication']
 const MIN = 15
-const MAX = 20
+const MAX = 60
 
 const configSchema = z.object({
   name: z.string().min(1, 'Le nom est requis.').max(200),
@@ -76,6 +77,7 @@ export function EvaluationWizard() {
   const [step, setStep] = useState(0)
   const [academicSessionId, setAcademicSessionId] = useState('')
   const [subjectId, setSubjectId] = useState('')
+  const [groupId, setGroupId] = useState('') // groupe cible (optionnel)
   const [selected, setSelected] = useState<string[]>([])
   const [publishNow, setPublishNow] = useState(false)
   const [opensAt, setOpensAt] = useState('')
@@ -124,6 +126,10 @@ export function EvaluationWizard() {
     queryKey: ['subjects'],
     queryFn: () => getSubjects(),
   })
+  const { data: groups } = useQuery({
+    queryKey: ['groups', 'wizard'],
+    queryFn: () => getGroups({ limit: 100 }),
+  })
   const { data: questions } = useQuery({
     queryKey: ['questions', subjectId],
     queryFn: () => getQuestions(subjectId),
@@ -138,6 +144,7 @@ export function EvaluationWizard() {
     setIsEditing(true)
     setAcademicSessionId(editingEvaluation.academicSession?.id ?? '')
     setSubjectId(editingEvaluation.subject?.id ?? '')
+    setGroupId(editingEvaluation.groupId ?? '')
     setSelected(editingEvaluation.examQuestions.map((q) => q.question.id))
     form.reset({
       name: editingEvaluation.title,
@@ -178,6 +185,7 @@ export function EvaluationWizard() {
         await updateEvaluation(editingEvaluationId, {
           ...form.getValues(),
           academicSessionId,
+          groupId: groupId || null, // null => retirer le groupe cible
         })
         await setEvaluationQuestions(editingEvaluationId, selected)
         return
@@ -187,6 +195,7 @@ export function EvaluationWizard() {
         ...form.getValues(),
         subjectId,
         academicSessionId,
+        groupId: groupId || undefined,
         questionIds: selected,
       })
       if (publishNow) {
@@ -215,6 +224,9 @@ export function EvaluationWizard() {
   const subjectName = subjects?.data.find((s) => s.id === subjectId)?.name ?? '—'
   const sessionName =
     sessions?.data.find((s) => s.id === academicSessionId)?.name ?? '—'
+  const groupName = groupId
+    ? (groups?.data.find((g) => g.id === groupId)?.name ?? '—')
+    : 'Tous les étudiants'
 
   async function next() {
     setError(null)
@@ -439,6 +451,25 @@ export function EvaluationWizard() {
                       {...form.register('description')}
                     />
                   </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="groupId">Groupe / Classe cible</Label>
+                    <NativeSelect
+                      id="groupId"
+                      value={groupId}
+                      onChange={(e) => setGroupId(e.target.value)}
+                    >
+                      <option value="">— Aucun (tous les étudiants) —</option>
+                      {groups?.data.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                          {g.level ? ` · ${g.level}` : ''}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                    <p className="text-xs text-muted-foreground">
+                      Optionnel : cible une classe précise pour cette évaluation.
+                    </p>
+                  </div>
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="durationMinutes">Durée (min)</Label>
@@ -597,6 +628,7 @@ export function EvaluationWizard() {
                       ['Session', sessionName],
                       ['Nom', form.getValues('name')],
                       ['Matière', subjectName],
+                      ['Groupe cible', groupName],
                       ['Durée', `${form.getValues('durationMinutes')} min`],
                       ['Questions', `${selected.length}`],
                       ['Score min', `${form.getValues('passScore')} %`],

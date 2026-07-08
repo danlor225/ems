@@ -119,22 +119,34 @@ function ResultDetailModal({
                   <p className="mb-2 text-sm font-medium text-foreground">
                     {qi + 1}. {item.statement}
                   </p>
-                  <div className="space-y-1">
-                    {item.options.map((opt) => {
-                      const isSelected = item.selectedOptionId === opt.id
-                      const cls = opt.isCorrect
-                        ? 'text-success'
-                        : isSelected
-                          ? 'text-danger'
-                          : 'text-muted-foreground'
-                      return (
-                        <div key={opt.id} className={`text-sm ${cls}`}>
-                          {opt.isCorrect ? '✓ ' : isSelected ? '✗ ' : '• '}
-                          {opt.text}
-                        </div>
-                      )
-                    })}
-                  </div>
+                  {item.type === 'SHORT_ANSWER' ? (
+                    <div className="space-y-1 text-sm">
+                      <div className={item.isCorrect ? 'text-success' : 'text-danger'}>
+                        {item.isCorrect ? '✓ ' : '✗ '}
+                        Réponse : {item.textAnswer || '(vide)'}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Acceptées : {item.acceptedAnswers.join(', ') || '—'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {item.options.map((opt) => {
+                        const isSelected = item.selectedOptionIds.includes(opt.id)
+                        const cls = opt.isCorrect
+                          ? 'text-success'
+                          : isSelected
+                            ? 'text-danger'
+                            : 'text-muted-foreground'
+                        return (
+                          <div key={opt.id} className={`text-sm ${cls}`}>
+                            {opt.isCorrect ? '✓ ' : isSelected ? '✗ ' : '• '}
+                            {opt.text}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

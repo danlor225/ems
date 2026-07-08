@@ -18,6 +18,7 @@ import { AcademicSessionsModule } from './modules/academic-sessions/academic-ses
 import { EvaluationsModule } from './modules/evaluations/evaluations.module';
 import { GroupsModule } from './modules/groups/groups.module';
 import { CertificatesModule } from './modules/certificates/certificates.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -58,6 +59,8 @@ import { validateEnv } from './config/env.validation';
     GroupsModule,
     // v2 : certificats de réussite (routes /api/certificates/...).
     CertificatesModule,
+    // v2 : rapports analytiques agrégés (routes /api/reports/...).
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [

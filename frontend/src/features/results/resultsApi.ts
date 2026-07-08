@@ -26,10 +26,15 @@ export interface StaffResult {
   passed: boolean
   correction: {
     questionId: string
+    type: 'SINGLE_CHOICE' | 'TRUE_FALSE' | 'MULTIPLE_CHOICE' | 'SHORT_ANSWER'
     statement: string
     points: number
     selectedOptionId: string | null
     correctOptionId: string | null
+    selectedOptionIds: string[]
+    correctOptionIds: string[]
+    textAnswer: string | null
+    acceptedAnswers: string[]
     isCorrect: boolean
     options: { id: string; text: string; isCorrect: boolean }[]
   }[]

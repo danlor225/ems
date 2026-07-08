@@ -24,7 +24,7 @@ import { createExam, publishExam } from './examsApi'
 const EASE = [0.16, 1, 0.3, 1] as const
 const STEPS = ['Informations', 'Questions', 'Révision']
 const MIN = 15
-const MAX = 20
+const MAX = 60
 
 const schema = z.object({
   title: z.string().min(1, 'Le titre est requis.').max(200),

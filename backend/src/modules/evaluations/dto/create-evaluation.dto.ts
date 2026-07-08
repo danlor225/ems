@@ -45,7 +45,7 @@ export class CreateEvaluationDto {
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(20)
+  @ArrayMaxSize(60)
   @IsUUID(undefined, { each: true })
   questionIds?: string[];
 }

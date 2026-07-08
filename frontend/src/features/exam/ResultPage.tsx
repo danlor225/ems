@@ -42,6 +42,44 @@ export function ResultPage() {
     )
   }
 
+  // L'enseignant a désactivé l'affichage immédiat : confirmation seule,
+  // ni note ni correction.
+  if (data.hidden) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: EASE }}
+          className="w-full max-w-md"
+        >
+          <Card>
+            <CardContent className="flex flex-col items-center py-12 text-center">
+              <div className="grid size-14 place-items-center rounded-full bg-success/15 text-success">
+                <CheckCircle2 className="size-7" />
+              </div>
+              <h1 className="mt-4 text-lg font-bold text-foreground">
+                Évaluation enregistrée
+              </h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Merci, vos réponses ont bien été soumises. Votre note et la
+                correction seront communiquées par votre enseignant.
+              </p>
+              <Button className="mt-6" onClick={() => navigate('/')}>
+                Retour à l'accueil
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    )
+  }
+
+  const score = data.attempt.score ?? 0
+  const totalPoints = data.exam.totalPoints ?? 0
+  const correction = data.correction ?? []
+  const passed = data.passed ?? false
+
   return (
     <div className="min-h-screen bg-background p-4 lg:p-6">
       <div className="mx-auto max-w-3xl space-y-6">
@@ -55,12 +93,12 @@ export function ResultPage() {
             <CardContent className="flex flex-col items-center py-10 text-center">
               <div
                 className={
-                  data.passed
+                  passed
                     ? 'grid size-14 place-items-center rounded-full bg-success/15 text-success'
                     : 'grid size-14 place-items-center rounded-full bg-danger/15 text-danger'
                 }
               >
-                {data.passed ? (
+                {passed ? (
                   <CheckCircle2 className="size-7" />
                 ) : (
                   <XCircle className="size-7" />
@@ -70,19 +108,16 @@ export function ResultPage() {
                 Merci, votre évaluation est terminée.
               </p>
               <p className="mt-1 text-5xl font-extrabold tracking-tight text-primary">
-                {data.attempt.score}
+                {score}
                 <span className="text-2xl text-muted-foreground">
                   {' '}
-                  / {data.exam.totalPoints}
+                  / {totalPoints}
                 </span>
               </p>
               <Badge variant="info" className="mt-3">
                 {(() => {
-                  const score = data.attempt.score ?? 0
                   const percentage =
-                    data.exam.totalPoints > 0
-                      ? (score / data.exam.totalPoints) * 100
-                      : 0
+                    totalPoints > 0 ? (score / totalPoints) * 100 : 0
 
                   if (score >= 17 || percentage >= 85) return 'Très bien'
                   if (
@@ -105,15 +140,34 @@ export function ResultPage() {
         {/* Correction */}
         <div className="space-y-4">
           <h2 className="font-semibold text-foreground">Correction</h2>
-          {data.correction.map((item, qi) => (
+          {correction.map((item, qi) => (
             <Card key={item.questionId}>
               <CardContent className="p-5">
                 <p className="mb-3 font-medium text-foreground">
                   {qi + 1}. {item.statement}
                 </p>
+                {item.type === 'SHORT_ANSWER' ? (
+                  <div className="space-y-2 text-sm">
+                    <div
+                      className={`rounded-lg border p-2.5 ${
+                        item.isCorrect
+                          ? 'border-success/40 bg-success/10 text-success'
+                          : 'border-danger/40 bg-danger/10 text-danger'
+                      }`}
+                    >
+                      Votre réponse : {item.textAnswer || '(vide)'}{' '}
+                      {item.isCorrect ? '✓' : '✗'}
+                    </div>
+                    {!item.isCorrect && item.acceptedAnswers.length > 0 && (
+                      <div className="rounded-lg border border-success/40 bg-success/10 p-2.5 text-success">
+                        Réponse(s) acceptée(s) : {item.acceptedAnswers.join(', ')}
+                      </div>
+                    )}
+                  </div>
+                ) : (
                 <div className="space-y-2">
                   {item.options.map((opt) => {
-                    const isSelected = item.selectedOptionId === opt.id
+                    const isSelected = item.selectedOptionIds.includes(opt.id)
                     const cls = opt.isCorrect
                       ? 'border-success/40 bg-success/10 text-success'
                       : isSelected
@@ -136,6 +190,7 @@ export function ResultPage() {
                     )
                   })}
                 </div>
+                )}
               </CardContent>
             </Card>
           ))}
