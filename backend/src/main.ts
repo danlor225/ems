@@ -49,9 +49,14 @@ async function bootstrap() {
   // 5) Arrêt propre : déclenche onModuleDestroy (donc la déconnexion Prisma).
   app.enableShutdownHooks();
 
-  const port = config.get<number>('BACKEND_PORT') ?? 3000;
-  await app.listen(port);
+  // Railway (et la plupart des PaaS) imposent le port d'écoute via la variable PORT.
+  // On la privilégie ; sinon on retombe sur BACKEND_PORT (dev/Docker Compose).
+  const port = process.env.PORT
+    ? Number(process.env.PORT)
+    : (config.get<number>('BACKEND_PORT') ?? 3000);
+  // 0.0.0.0 : indispensable pour être joignable depuis l'extérieur du conteneur.
+  await app.listen(port, '0.0.0.0');
 
-  console.log(`✅ EMS API démarrée sur http://localhost:${port}/api`);
+  console.log(`✅ EMS API démarrée sur le port ${port} (préfixe /api)`);
 }
 bootstrap();

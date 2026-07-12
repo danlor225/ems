@@ -36,6 +36,13 @@ const envSchema = z.object({
   // Liste séparée par des virgules, ex: "https://ems.mondomaine.fr,https://www.ems.mondomaine.fr".
   // Optionnel : si absent, on retombe sur http://localhost:FRONTEND_PORT (pratique en DEV).
   CORS_ORIGIN: z.string().min(1).optional(),
+
+  // Politique SameSite du cookie de refresh (voir auth.cookie.ts).
+  //  - 'strict' : front + API sur la même origine (reverse proxy unique).
+  //  - 'lax'    : sous-domaines d'un même domaine racine (Railway + Vercel + domaine perso).
+  //  - 'none'   : vrai cross-site (impose Secure).
+  // Optionnel : défaut 'strict' en prod, 'lax' en dev.
+  COOKIE_SAMESITE: z.enum(['strict', 'lax', 'none']).optional(),
 });
 
 // Le type est INFÉRÉ du schéma : une seule source de vérité (DRY).

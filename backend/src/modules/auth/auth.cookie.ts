@@ -45,14 +45,22 @@ export function parseDurationToMs(value: string): number {
 /** Options du cookie de refresh, cohérentes login / refresh / logout. */
 export function refreshCookieOptions(config: ConfigService): CookieOptions {
   const isProd = config.get<string>('NODE_ENV') === 'production';
+  // SameSite paramétrable via COOKIE_SAMESITE :
+  //  - 'strict' : front + API sur la MÊME origine (reverse proxy unique).
+  //  - 'lax'    : front + API sur des SOUS-DOMAINES d'un même domaine racine
+  //               (ex: app.mondomaine.fr / api.mondomaine.fr = same-site) — cookie
+  //               first-party, robuste (cas Railway + Vercel avec domaine perso).
+  //  - 'none'   : vrai cross-site (domaines racines différents) — EXIGE Secure ;
+  //               cookie tiers (bloqué par Safari, fragile sur Chrome).
+  // Défaut prudent : 'strict' en prod, 'lax' en dev.
+  const sameSite = (config.get<string>('COOKIE_SAMESITE') ??
+    (isProd ? 'strict' : 'lax')) as 'strict' | 'lax' | 'none';
   return {
     httpOnly: true,
-    // En prod (HTTPS derrière le reverse proxy) : Secure obligatoire.
-    // En dev (http://localhost) : Secure=false sinon le navigateur rejette le cookie.
-    secure: isProd,
-    // 'strict' convient au déploiement recommandé (front + API sur la MÊME origine
-    // via le reverse proxy). En hébergement cross-site, il faudrait 'none' + secure.
-    sameSite: isProd ? 'strict' : 'lax',
+    // Secure obligatoire en prod (HTTPS) et imposé dès que SameSite='none'.
+    // En dev (http://localhost) : false, sinon le navigateur rejette le cookie.
+    secure: isProd || sameSite === 'none',
+    sameSite,
     path: REFRESH_COOKIE_PATH,
     maxAge: parseDurationToMs(
       config.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d',
