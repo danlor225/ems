@@ -13,25 +13,37 @@ import {
   Ip,
   Patch,
   Post,
+  Req,
+  Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
+import type { Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuthService } from './auth.service';
 import type { SafeUser } from './auth.service';
+import {
+  REFRESH_COOKIE_NAME,
+  clearRefreshCookieOptions,
+  refreshCookieOptions,
+} from './auth.cookie';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Controller('auth') // préfixe des routes : /api/auth/...
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly config: ConfigService,
+  ) {}
 
   // POST /api/auth/register — limite stricte : 5 tentatives / minute / IP.
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
@@ -45,26 +57,52 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK) // 200 : pas de création de ressource, juste une vérification
-  login(
+  async login(
     @Body() dto: LoginDto,
     @Ip() ip: string,
+    @Res({ passthrough: true }) res: Response,
     @Headers('user-agent') userAgent?: string,
   ) {
-    return this.authService.login(dto, { ip, userAgent });
+    const { refreshToken, ...rest } = await this.authService.login(dto, {
+      ip,
+      userAgent,
+    });
+    // Le refresh token part en cookie httpOnly (jamais exposé au JS du navigateur).
+    res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions(this.config));
+    // On ne renvoie que l'access token + l'utilisateur dans le corps.
+    return rest;
   }
 
-  // POST /api/auth/refresh — échange un refresh token contre une nouvelle paire.
+  // POST /api/auth/refresh — échange le refresh token (lu dans le cookie) contre une
+  // nouvelle paire (rotation). Aucun token n'est attendu dans le corps.
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh(dto.refreshToken);
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const token = req.cookies?.[REFRESH_COOKIE_NAME] as string | undefined;
+    if (!token) {
+      throw new UnauthorizedException('Refresh token manquant.');
+    }
+    const { refreshToken, accessToken } = await this.authService.refresh(token);
+    // Rotation : on repose le NOUVEAU refresh token en cookie.
+    res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions(this.config));
+    return { accessToken };
   }
 
-  // POST /api/auth/logout — révoque le refresh token (déconnexion).
+  // POST /api/auth/logout — révoque le refresh token (cookie) et l'efface côté client.
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT) // 204 : succès sans contenu renvoyé
-  logout(@Body() dto: RefreshTokenDto) {
-    return this.authService.logout(dto.refreshToken);
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const token = req.cookies?.[REFRESH_COOKIE_NAME] as string | undefined;
+    if (token) {
+      await this.authService.logout(token);
+    }
+    res.clearCookie(REFRESH_COOKIE_NAME, clearRefreshCookieOptions());
   }
 
   // GET /api/auth/me — route PROTÉGÉE : nécessite un access token valide.

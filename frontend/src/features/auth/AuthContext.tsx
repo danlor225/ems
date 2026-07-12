@@ -33,15 +33,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isBootstrapping, setIsBootstrapping] = useState(true)
 
-  // Au démarrage : si un refresh token existe, on récupère l'utilisateur.
-  // L'intercepteur Axios rafraîchit l'access token automatiquement.
+  // Au démarrage : on tente de récupérer l'utilisateur. L'access token vit en
+  // mémoire (perdu au rechargement) ; l'appel /auth/me part donc sans jeton et
+  // reçoit un 401 => l'intercepteur Axios tente un refresh silencieux via le
+  // cookie httpOnly. S'il existe et reste valide, la session est restaurée ;
+  // sinon l'utilisateur n'est simplement pas connecté.
   useEffect(() => {
     let active = true
     async function bootstrap() {
-      if (!tokenStore.getRefreshToken()) {
-        setIsBootstrapping(false)
-        return
-      }
       try {
         const me = await authApi.me()
         if (active) setUser(me)
@@ -59,8 +58,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function login(email: string, password: string) {
     const res = await authApi.login(email, password)
+    // Access token en mémoire ; le refresh token est posé en cookie httpOnly
+    // par le backend (invisible au JS).
     tokenStore.setAccessToken(res.accessToken)
-    tokenStore.setRefreshToken(res.refreshToken)
     setUser(res.user)
     return res.user
   }
@@ -82,12 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    const refreshToken = tokenStore.getRefreshToken()
-    if (refreshToken) {
-      await authApi.logout(refreshToken).catch(() => {
-        // déconnexion best-effort : on nettoie même si l'appel échoue
-      })
-    }
+    // Le cookie httpOnly est envoyé automatiquement ; le backend le révoque
+    // et l'efface. Best-effort : on nettoie même si l'appel échoue.
+    await authApi.logout().catch(() => {})
     tokenStore.clear()
     setUser(null)
   }

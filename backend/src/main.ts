@@ -1,6 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
@@ -14,10 +15,18 @@ async function bootstrap() {
   //    attaques : clickjacking, sniffing MIME, etc.) — OWASP A05.
   app.use(helmet());
 
-  // 2) CORS : seul le front (sur son port) est autorisé à appeler l'API.
+  // 2) CORS : seule l'origine du front est autorisée à appeler l'API.
   //    credentials: true => nécessaire pour envoyer/recevoir les cookies (refresh token).
+  //    - En PROD : on liste les origines réelles via CORS_ORIGIN (séparées par des virgules).
+  //    - En DEV  : si CORS_ORIGIN est absent, on retombe sur http://localhost:FRONTEND_PORT.
+  //  cookieParser : parse l'en-tête Cookie => req.cookies (lecture du refresh token httpOnly).
+  app.use(cookieParser());
+
+  const corsOrigin = config.get<string>('CORS_ORIGIN');
   app.enableCors({
-    origin: `http://localhost:${config.get<number>('FRONTEND_PORT')}`,
+    origin: corsOrigin
+      ? corsOrigin.split(',').map((o) => o.trim())
+      : `http://localhost:${config.get<number>('FRONTEND_PORT')}`,
     credentials: true,
   });
 

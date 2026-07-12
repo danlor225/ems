@@ -1,0 +1,41 @@
+# ============================================================
+#  EMS — Override de PRODUCTION.
+#  À utiliser EN PLUS du docker-compose.yml de base :
+#    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+#  Rôle : durcir la stack pour un vrai déploiement (vs dev/démo localhost).
+#   - N'expose PLUS PostgreSQL sur l'hôte (accès réseau Docker interne only).
+#   - Retire Adminer du démarrage par défaut (profil "maintenance").
+#   - Injecte l'URL publique de l'API dans le build front (VITE_API_URL).
+#   - Passe CORS_ORIGIN au backend + ajoute un healthcheck API.
+# ============================================================
+
+services:
+  postgres:
+    # Liste de ports vidée : la base n'est plus joignable depuis l'extérieur.
+    # Les autres conteneurs y accèdent via le DNS interne "postgres:5432".
+    ports: []
+
+  adminer:
+    # Ne démarre que si on l'active explicitement pour une opération de maintenance :
+    #   docker compose --profile maintenance up -d adminer
+    profiles: ["maintenance"]
+
+  backend:
+    environment:
+      # Origine(s) autorisée(s) par CORS en prod (défini dans le .env).
+      CORS_ORIGIN: ${CORS_ORIGIN}
+    healthcheck:
+      # Vérifie que l'API répond (route GET /api).
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    build:
+      args:
+        # URL PUBLIQUE de l'API, gravée dans le bundle au build.
+        # Remplace le "http://localhost:3000/api" du compose de base.
+        VITE_API_URL: ${VITE_API_URL}

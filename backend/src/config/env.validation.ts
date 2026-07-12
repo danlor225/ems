@@ -29,8 +29,13 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
-  // Utilisé pour autoriser le front dans la configuration CORS.
+  // Utilisé pour autoriser le front dans la configuration CORS (fallback DEV).
   FRONTEND_PORT: z.coerce.number().int().positive().default(5173),
+
+  // Origine(s) autorisée(s) par CORS en PRODUCTION.
+  // Liste séparée par des virgules, ex: "https://ems.mondomaine.fr,https://www.ems.mondomaine.fr".
+  // Optionnel : si absent, on retombe sur http://localhost:FRONTEND_PORT (pratique en DEV).
+  CORS_ORIGIN: z.string().min(1).optional(),
 });
 
 // Le type est INFÉRÉ du schéma : une seule source de vérité (DRY).

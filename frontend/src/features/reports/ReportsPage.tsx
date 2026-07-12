@@ -176,7 +176,7 @@ function ReportSection({
                     unit="%"
                   />
                   <Tooltip
-                    formatter={(v: number, name) => [
+                    formatter={(v, name) => [
                       `${v}%`,
                       name === 'successRate' ? 'Réussite' : 'Moyenne',
                     ]}

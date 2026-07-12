@@ -22,15 +22,15 @@ api.interceptors.request.use((config) => {
 let refreshing: Promise<string> | null = null
 
 async function refreshAccessToken(): Promise<string> {
-  const refreshToken = tokenStore.getRefreshToken()
-  if (!refreshToken) throw new Error('Aucun refresh token')
+  // Le refresh token est dans un cookie httpOnly : on n'a rien à envoyer,
+  // le navigateur joint le cookie automatiquement (withCredentials).
   // Appel "nu" (axios direct, sans intercepteur) pour éviter la récursion.
-  const { data } = await axios.post<{
-    accessToken: string
-    refreshToken: string
-  }>(`${baseURL}/auth/refresh`, { refreshToken })
+  const { data } = await axios.post<{ accessToken: string }>(
+    `${baseURL}/auth/refresh`,
+    {},
+    { withCredentials: true },
+  )
   tokenStore.setAccessToken(data.accessToken)
-  tokenStore.setRefreshToken(data.refreshToken)
   return data.accessToken
 }
 

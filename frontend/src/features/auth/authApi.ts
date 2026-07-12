@@ -6,7 +6,6 @@ import type { AuthUser } from './types'
 
 export interface LoginResponse {
   accessToken: string
-  refreshToken: string
   user: AuthUser
 }
 
@@ -28,8 +27,9 @@ export const authApi = {
 
   me: () => api.get<AuthUser>('/auth/me').then((r) => r.data),
 
-  logout: (refreshToken: string) =>
-    api.post('/auth/logout', { refreshToken }),
+  // Le refresh token étant dans un cookie httpOnly, aucun argument à passer :
+  // le navigateur envoie le cookie, le backend le révoque et l'efface.
+  logout: () => api.post('/auth/logout'),
 
   updateProfile: (input: { firstName?: string; lastName?: string }) =>
     api.patch<AuthUser>('/auth/me', input).then((r) => r.data),

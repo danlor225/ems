@@ -4,7 +4,13 @@
 // ============================================================
 import type { Aggregate, ReportsData } from './reportsApi'
 
-const SECTIONS: { key: keyof ReportsData; title: string; head: string }[] = [
+// Clés de ReportsData dont la valeur est un tableau d'Aggregate
+// (exclut `overview`, qui est un Aggregate unique) => data[key] est un Aggregate[].
+type ReportListKey = {
+  [K in keyof ReportsData]: ReportsData[K] extends Aggregate[] ? K : never
+}[keyof ReportsData]
+
+const SECTIONS: { key: ReportListKey; title: string; head: string }[] = [
   { key: 'bySubject', title: 'Par matière', head: 'Matière' },
   { key: 'byGroup', title: 'Par groupe', head: 'Groupe' },
   { key: 'timeline', title: 'Par période', head: 'Période' },
