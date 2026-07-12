@@ -16,7 +16,7 @@ const SECTIONS: { key: ReportListKey; title: string; head: string }[] = [
   { key: 'timeline', title: 'Par période', head: 'Période' },
 ]
 
-const COLS = ['Participants', 'Moyenne (%)', 'Réussite (%)']
+const COLS = ['Participants', 'Moyenne /20', 'Réussite (%)']
 
 function rowsOf(items: Aggregate[]) {
   return items.map((a) => [a.label, a.participants, a.average, a.successRate])
@@ -75,7 +75,7 @@ export async function exportReportsPdf(data: ReportsData) {
   doc.setTextColor('#64748B')
   doc.text(
     `Édité le ${new Date().toLocaleDateString('fr-FR')}   ·   Global : ` +
-      `${data.overview.participants} participants, moyenne ${data.overview.average}%, ` +
+      `${data.overview.participants} participants, moyenne ${data.overview.average}/20, ` +
       `réussite ${data.overview.successRate}%`,
     14,
     25,

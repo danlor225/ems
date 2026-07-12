@@ -18,7 +18,7 @@ interface AttemptRow {
 export interface Aggregate {
   label: string;
   participants: number;
-  average: number; // pourcentage moyen
+  average: number; // moyenne sur 20
   successRate: number; // % de réussite
 }
 
@@ -84,7 +84,8 @@ export class ReportsService {
     return {
       label,
       participants: n,
-      average: this.round2(sum / n),
+      // `pct` est un pourcentage (0-100) ; on l'exprime sur 20.
+      average: this.round2(sum / n / 5),
       successRate: this.round2((passed / n) * 100),
     };
   }

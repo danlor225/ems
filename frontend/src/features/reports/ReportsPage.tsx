@@ -100,7 +100,7 @@ export function ReportsPage() {
               label="Moyenne générale"
               icon={TrendingUp}
               tone="warning"
-              value={`${data.overview.average}%`}
+              value={`${data.overview.average}/20`}
             />
             <StatCard
               label="Taux de réussite"
@@ -161,7 +161,12 @@ function ReportSection({
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={items}
+                  data={items.map((a) => ({
+                    ...a,
+                    // La moyenne (sur 20) est ramenée en % pour partager
+                    // l'axe avec le taux de réussite (20/20 ≡ 100 %).
+                    averagePct: a.average * 5,
+                  }))}
                   margin={{ top: 8, right: 8, left: -16, bottom: 8 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -179,10 +184,11 @@ function ReportSection({
                     unit="%"
                   />
                   <Tooltip
-                    formatter={(v, name) => [
-                      `${v}%`,
-                      name === 'successRate' ? 'Réussite' : 'Moyenne',
-                    ]}
+                    formatter={(v, name) =>
+                      name === 'successRate'
+                        ? [`${v}%`, 'Réussite']
+                        : [`${Number(v) / 5}/20`, 'Moyenne']
+                    }
                     contentStyle={{
                       borderRadius: 12,
                       border: '1px solid #E2E8F0',
@@ -196,7 +202,7 @@ function ReportSection({
                     radius={[6, 6, 0, 0]}
                   />
                   <Bar
-                    dataKey="average"
+                    dataKey="averagePct"
                     name="average"
                     fill="#60A5FA"
                     radius={[6, 6, 0, 0]}
@@ -224,7 +230,7 @@ function ReportSection({
                       {a.participants}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {a.average}%
+                      {a.average}/20
                     </TableCell>
                     <TableCell>
                       <span

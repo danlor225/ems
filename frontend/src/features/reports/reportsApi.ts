@@ -6,7 +6,7 @@ import { api } from '../../lib/api'
 export interface Aggregate {
   label: string
   participants: number
-  average: number // pourcentage moyen
+  average: number // moyenne sur 20
   successRate: number // % de réussite
 }
 
