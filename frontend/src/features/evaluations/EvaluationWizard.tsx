@@ -107,7 +107,7 @@ export function EvaluationWizard() {
       randomizeQuestions: true,
       oneQuestionAtATime: false,
       shuffleAnswers: true,
-      showResultImmediately: true,
+      showResultImmediately: false,
       autoGrade: true,
     },
   })

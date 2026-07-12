@@ -192,7 +192,7 @@ model Exam {
   randomizeQuestions    Boolean          @default(true) @map("randomize_questions")
   oneQuestionAtATime    Boolean          @default(false) @map("one_question_at_a_time")
   shuffleAnswers        Boolean          @default(true) @map("shuffle_answers")
-  showResultImmediately Boolean          @default(true) @map("show_result_immediately")
+  showResultImmediately Boolean          @default(false) @map("show_result_immediately")
   autoGrade             Boolean          @default(true) @map("auto_grade")
   level                 String?
   groupId               String?          @map("group_id") @db.Uuid
