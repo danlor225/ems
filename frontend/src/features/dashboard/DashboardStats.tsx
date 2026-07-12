@@ -49,21 +49,25 @@ export function DashboardStats() {
         <StatCard
           label="Examens"
           icon={FileText}
+          tone="primary"
           value={<AnimatedCounter value={data.counts.exams} />}
         />
         <StatCard
           label="Sessions"
           icon={CalendarClock}
+          tone="sky"
           value={<AnimatedCounter value={data.counts.sessions} />}
         />
         <StatCard
           label="Étudiants"
           icon={Users}
+          tone="info"
           value={<AnimatedCounter value={data.counts.students} />}
         />
         <StatCard
           label="Tentatives"
           icon={ClipboardList}
+          tone="success"
           value={<AnimatedCounter value={data.counts.attempts} />}
         />
       </div>

@@ -93,16 +93,19 @@ export function ReportsPage() {
             <StatCard
               label="Participations"
               icon={Users}
+              tone="info"
               value={data.overview.participants}
             />
             <StatCard
               label="Moyenne générale"
               icon={TrendingUp}
+              tone="warning"
               value={`${data.overview.average}%`}
             />
             <StatCard
               label="Taux de réussite"
               icon={CheckCircle2}
+              tone="success"
               value={`${data.overview.successRate}%`}
             />
           </div>

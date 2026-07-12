@@ -278,16 +278,18 @@ export function ResultsPage() {
         <>
           {/* Analyses */}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Participants" icon={Users} value={data.stats.participants} />
+            <StatCard label="Participants" icon={Users} tone="info" value={data.stats.participants} />
             <StatCard
               label="Moyenne"
               icon={TrendingUp}
+              tone="warning"
               value={`${data.stats.average} / ${data.evaluation.totalPoints}`}
             />
-            <StatCard label="Taux de réussite" icon={CheckCircle2} value={`${data.stats.successRate}%`} />
+            <StatCard label="Taux de réussite" icon={CheckCircle2} tone="success" value={`${data.stats.successRate}%`} />
             <StatCard
               label="Meilleure note"
               icon={Award}
+              tone="primary"
               value={`${data.stats.max} / ${data.evaluation.totalPoints}`}
             />
           </div>

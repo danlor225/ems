@@ -184,10 +184,14 @@ et lu **exclusivement dans un cookie `httpOnly` + `Secure` (prod) + `SameSite` +
 - Frontend : `tokenStore.ts` ne garde que l'access token en mémoire ; `api.ts`,
   `authApi.ts` et `AuthContext.tsx` s'appuient sur le cookie (`withCredentials`).
 
-> **Note cross-site** : `SameSite=strict` convient au déploiement recommandé (front +
-> API sur la **même origine** via le reverse proxy). En hébergement cross-site (Cas C,
-> front CDN + API séparée), il faudrait passer le cookie en `SameSite=None; Secure` et
-> ajuster la config CORS en conséquence.
+> **`SameSite` paramétrable via `COOKIE_SAMESITE`** (défaut : `strict` en prod).
+> - `strict` : front + API sur la **même origine** (reverse proxy unique — Cas A).
+> - `lax`    : front + API sur des **sous-domaines d'un même domaine racine**
+>   (ex. `app.` / `api.mondomaine.fr` = *same-site*) — cookie first-party, robuste.
+>   C'est le réglage du déploiement **Railway + Vercel** (voir
+>   `docs/DEPLOIEMENT-RAILWAY-VERCEL.md`).
+> - `none`   : vrai **cross-site** (domaines racines différents) — impose `Secure` ;
+>   cookie tiers, bloqué par Safari et fragile sur Chrome (à éviter).
 
 ### 2.7 — Throttler en mémoire → incompatible multi-instance (LIMITE de scalabilité)
 
@@ -253,25 +257,29 @@ existe déjà.
 > La suite du rapport déroule le **Cas A** de bout en bout. Les cas B et C réutilisent
 > les mêmes correctifs (§2) ; seules changent la couche proxy et la provenance de
 > `DATABASE_URL`.
+>
+> 📄 **Déploiement retenu pour EMS : Railway (backend + PostgreSQL) + Vercel (frontend)**
+> avec domaine personnalisé (front/API en sous-domaines = *same-site*, cookie `Lax`).
+> Guide dédié pas-à-pas : **`docs/DEPLOIEMENT-RAILWAY-VERCEL.md`**. C'est une variante
+> du Cas C (front CDN + API séparée), avec le point d'attention cookie cross-site
+> résolu par `COOKIE_SAMESITE=lax` (§2.6).
 
 ---
 
 ## 5. Déploiement pas-à-pas (Cas A)
 
-### Étape 5.0 — Geler le code et committer les changements en cours
+### Étape 5.0 — Geler le code et committer les changements — ✅ FAIT
 
-`git status` montre des modifications **non commitées** :
-`schema.prisma`, `EvaluationWizard.tsx`, et surtout une **nouvelle migration non
-commitée** `20260708140420_hide_result_by_default/`.
+La migration `20260708140420_hide_result_by_default/` et les correctifs de production
+sont **commités et poussés** sur `feat/backend-foundation` :
 
-> ⚠ **On ne déploie jamais un dépôt sale.** La migration doit être versionnée, sinon
-> `migrate deploy` sur le serveur ne la connaîtra pas (ou pire, incohérence entre le
-> schéma et les migrations). Commit + push sur la branche de release d'abord.
+- `7f7a091` feat(results): masquer les résultats par défaut (schéma + migration + wizard).
+- `4ab5f50` feat(deploy): durcissement production (CORS, seed admin, cookie httpOnly).
+- `671e302` feat(deploy): support Railway (PORT) + Vercel (cookie cross-site, SPA).
 
-```bash
-git add backend/prisma backend/prisma/migrations frontend/src/features/evaluations/EvaluationWizard.tsx
-git commit -m "chore(db): migration hide_result_by_default + ajustements"
-```
+> ⚠ **On ne déploie jamais un dépôt sale.** La migration DOIT être versionnée, sinon
+> `migrate deploy` ne la connaîtra pas (incohérence schéma/migrations). C'est le cas :
+> `git status` doit être propre avant de déployer.
 
 ### Étape 5.1 — Provisionner le serveur
 
@@ -313,9 +321,10 @@ JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_SECRET=<autre_64_hex>
 JWT_REFRESH_EXPIRES_IN=7d
 
-# --- Nouveaux (voir §2.1 / §2.2) ---
+# --- Nouveaux (voir §2.1 / §2.2 / §2.6) ---
 CORS_ORIGIN=https://ems.mondomaine.fr
 VITE_API_URL=https://ems.mondomaine.fr/api
+COOKIE_SAMESITE=strict           # Cas A (même origine via proxy). Optionnel : défaut = strict en prod.
 
 # --- Frontend ---
 FRONTEND_PORT=5173               # interne ; le proxy expose 443

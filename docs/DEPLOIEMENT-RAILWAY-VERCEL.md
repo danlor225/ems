@@ -74,21 +74,21 @@ await app.listen(port, '0.0.0.0'); // 0.0.0.0 : joignable dans le conteneur Rail
 
 ---
 
-## Phase 1 — Préparer le dépôt
+## Phase 1 — Préparer le dépôt — ✅ FAIT
 
-1. Appliquer les **deux changements de code** de la Phase 0 (`auth.cookie.ts`, `main.ts`).
-2. Vérifier les builds en local :
-   ```bash
-   cd backend && npm run build
-   cd ../frontend && npm run build
-   ```
-3. Commit + push sur la branche déployée (Railway et Vercel déploient depuis GitHub) :
-   ```bash
-   git add backend/src/modules/auth/auth.cookie.ts backend/src/main.ts
-   git commit -m "feat(deploy): cookie SameSite paramétrable + port Railway (PORT)"
-   git push
-   ```
-4. S'assurer que la branche est poussée sur GitHub (Railway/Vercel s'y connectent).
+Les corrections nécessaires sont **déjà commitées et poussées** sur GitHub
+(branche `feat/backend-foundation`, commit `671e302`) :
+
+- `main.ts` → écoute `process.env.PORT` (Railway) sur `0.0.0.0`.
+- `auth.cookie.ts` → `SameSite` du cookie paramétrable via `COOKIE_SAMESITE`.
+- `env.validation.ts` + `.env.example` → variable `COOKIE_SAMESITE`.
+- `frontend/vercel.json` → rewrite SPA (fallback `index.html`).
+
+Builds vérifiés en local (`backend: nest build`, `frontend: tsc -b && vite build`) : OK.
+
+> **Avant de brancher les plateformes**, s'assurer que la branche à déployer est bien
+> à jour sur GitHub — Railway et Vercel se connectent au dépôt et déploient au push.
+> Si tu déploies depuis `main`, pense à y merger `feat/backend-foundation` d'abord.
 
 ---
 
@@ -244,8 +244,8 @@ VALUES (gen_random_uuid(), 'admin@mondomaine.fr', '<hash_bcrypt>', 'Admin', 'EMS
 
 ## Récapitulatif de l'ordre à suivre
 
-1. Phase 0 → 2 changements de code (`COOKIE_SAMESITE`, `PORT`) + choisir option A/B.
-2. Phase 1 → build local OK, commit, push.
+1. Phase 0 → ✅ 2 changements de code (`COOKIE_SAMESITE`, `PORT`) faits · **option A retenue** (`COOKIE_SAMESITE=lax`).
+2. Phase 1 → ✅ commité + poussé (`671e302`). Prochaine action réelle : Phase 2.
 3. Phase 2 → PostgreSQL sur Railway.
 4. Phase 3 → backend sur Railway (root `backend`, variables, domaine généré).
 5. Phase 4 → `vercel.json` + frontend sur Vercel (root `frontend`, `VITE_API_URL`).
