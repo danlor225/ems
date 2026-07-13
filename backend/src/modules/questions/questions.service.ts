@@ -137,16 +137,45 @@ export class QuestionsService {
     return question;
   }
 
-  /** Mise à jour des champs scalaires (404 si absente, 404 si nouvelle matière absente). */
+  /**
+   * Mise à jour d'une question (404 si absente, 404 si nouvelle matière absente).
+   * Si `options` est fourni, on remplace intégralement le jeu de réponses :
+   *  - validation selon le type ACTUEL (le type n'est pas modifiable après création) ;
+   *  - suppression des anciennes options puis recréation, en une transaction.
+   * NB : AttemptAnswer.selectedOptionId est en onDelete:SetNull → l'intégrité des
+   *      tentatives déjà soumises (dont le score est figé) est préservée.
+   */
   async update(id: string, dto: UpdateQuestionDto) {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
     if (dto.subjectId) {
       await this.subjectsService.findOne(dto.subjectId);
     }
-    return this.prisma.question.update({
-      where: { id },
-      data: dto,
-      include: { options: true },
+
+    const { options, ...scalars } = dto;
+    if (options) {
+      this.validateOptions(existing.type, options);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      if (options) {
+        await tx.answerOption.deleteMany({ where: { questionId: id } });
+      }
+      return tx.question.update({
+        where: { id },
+        data: {
+          ...scalars,
+          ...(options && {
+            options: {
+              create: options.map((o) => ({
+                text: o.text,
+                // Réponse libre : chaque option = un libellé accepté (isCorrect=true).
+                isCorrect: existing.type === 'SHORT_ANSWER' ? true : o.isCorrect,
+              })),
+            },
+          }),
+        },
+        include: { options: true },
+      });
     });
   }
 
