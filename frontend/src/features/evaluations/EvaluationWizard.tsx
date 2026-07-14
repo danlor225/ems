@@ -216,6 +216,18 @@ export function EvaluationWizard() {
   const toggle = (id: string) =>
     setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
 
+  // Sélection groupée : toutes les questions actuellement affichées (matière courante).
+  const displayedIds = questions?.data.map((q) => q.id) ?? []
+  const allDisplayedSelected =
+    displayedIds.length > 0 && displayedIds.every((id) => selected.includes(id))
+  function toggleAll() {
+    setSelected((prev) =>
+      allDisplayedSelected
+        ? prev.filter((id) => !displayedIds.includes(id)) // Tout désélectionner
+        : Array.from(new Set([...prev, ...displayedIds])), // Tout sélectionner
+    )
+  }
+
   const totalPoints =
     questions?.data
       .filter((q) => selected.includes(q.id))
@@ -561,23 +573,43 @@ export function EvaluationWizard() {
                       </NativeSelect>
                     </div>
                     {subjectId && questions && questions.data.length > 0 ? (
-                      <div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
-                        {questions.data.map((q) => (
-                          <label
-                            key={q.id}
-                            className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                          >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-foreground">
                             <input
                               type="checkbox"
-                              checked={selected.includes(q.id)}
-                              onChange={() => toggle(q.id)}
+                              aria-label="Tout sélectionner"
+                              checked={allDisplayedSelected}
+                              onChange={toggleAll}
                               className="size-4 accent-primary"
                             />
-                            <span className="text-foreground">
-                              {q.statement}
-                            </span>
+                            {allDisplayedSelected
+                              ? 'Tout désélectionner'
+                              : 'Tout sélectionner'}
                           </label>
-                        ))}
+                          <span className="text-xs text-muted-foreground">
+                            {selected.length} / {questions.data.length}{' '}
+                            sélectionnée{selected.length > 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                          {questions.data.map((q) => (
+                            <label
+                              key={q.id}
+                              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selected.includes(q.id)}
+                                onChange={() => toggle(q.id)}
+                                className="size-4 accent-primary"
+                              />
+                              <span className="text-foreground">
+                                {q.statement}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
                     ) : subjectId ? (
                       <p className="text-sm text-muted-foreground">
