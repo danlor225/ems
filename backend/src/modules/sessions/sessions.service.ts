@@ -82,6 +82,8 @@ export class SessionsService {
             title: true,
             durationMinutes: true,
             subjectId: true,
+            // Nombre de questions composant l'examen (sans les charger).
+            _count: { select: { examQuestions: true } },
           },
         },
       },

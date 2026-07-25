@@ -13,6 +13,8 @@ export interface AvailableSession {
     title: string
     durationMinutes: number
     subjectId: string
+    // Nombre de questions de l'examen (fourni par Prisma `_count`).
+    _count: { examQuestions: number }
   }
 }
 
