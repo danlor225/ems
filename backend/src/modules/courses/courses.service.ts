@@ -23,8 +23,9 @@ import {
   type UploadKind,
 } from './upload.config';
 
-// Acteur = qui agit (extrait du JWT) : sert aux règles de propriété.
-type Actor = { id: string; role: Role };
+// Acteur = qui agit (extrait du JWT) : sert aux règles de propriété et,
+// pour un étudiant, au filtrage des cours réservés à son groupe.
+type Actor = { id: string; role: Role; groupId?: string | null };
 
 @Injectable()
 export class CoursesService {
@@ -53,18 +54,20 @@ export class CoursesService {
           isPaid,
           // Un cours gratuit a toujours un prix nul (cohérence garantie ici).
           price: isPaid ? (dto.price ?? 0) : 0,
+          // null/absent => cours public ; sinon réservé à ce groupe.
+          groupId: dto.groupId ?? null,
           authorId: actor.id,
           resources: { create: this.toResourceData(dto.resources) },
         },
         include: { resources: { orderBy: { order: 'asc' } } },
       });
     } catch (error) {
-      // P2003 = FK invalide : la matière référencée n'existe pas.
+      // P2003 = FK invalide : matière OU groupe référencé inexistant.
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2003'
       ) {
-        throw new BadRequestException('Matière introuvable.');
+        throw new BadRequestException('Matière ou groupe introuvable.');
       }
       throw error;
     }
@@ -80,7 +83,16 @@ export class CoursesService {
 
     const where: Prisma.CourseWhereInput = {
       ...(subjectId ? { subjectId } : {}),
-      ...(viewer.role === Role.STUDENT ? { isPublished: true } : {}),
+      ...(viewer.role === Role.STUDENT
+        ? {
+            isPublished: true,
+            // Cours public (groupId null) OU réservé au groupe de l'étudiant.
+            // Un étudiant sans groupe ne voit que les cours publics.
+            OR: viewer.groupId
+              ? [{ groupId: null }, { groupId: viewer.groupId }]
+              : [{ groupId: null }],
+          }
+        : {}),
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -92,6 +104,7 @@ export class CoursesService {
         include: {
           subject: { select: { id: true, name: true } },
           author: { select: { id: true, firstName: true, lastName: true } },
+          group: { select: { id: true, name: true } },
           _count: { select: { resources: true } },
         },
       }),
@@ -114,15 +127,20 @@ export class CoursesService {
       include: {
         subject: { select: { id: true, name: true } },
         author: { select: { id: true, firstName: true, lastName: true } },
+        group: { select: { id: true, name: true } },
         resources: { orderBy: { order: 'asc' } },
       },
     });
 
-    if (!course || (viewer.role === Role.STUDENT && !course.isPublished)) {
+    const isStudent = viewer.role === Role.STUDENT;
+
+    // Un étudiant ne peut ouvrir ni un brouillon, ni un cours réservé à un
+    // AUTRE groupe que le sien (404 pour ne rien divulguer).
+    const wrongGroup =
+      isStudent && course?.groupId && course.groupId !== viewer.groupId;
+    if (!course || (isStudent && !course.isPublished) || wrongGroup) {
       throw new NotFoundException('Cours introuvable.');
     }
-
-    const isStudent = viewer.role === Role.STUDENT;
 
     // Verrouillage payant : un étudiant sans accès voit le cours mais PAS
     // ses ressources. Le staff a toujours accès.

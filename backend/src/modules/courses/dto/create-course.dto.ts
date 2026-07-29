@@ -47,6 +47,13 @@ export class CreateCourseDto {
   @Min(0, { message: 'Le prix doit être positif (FCFA).' })
   price?: number;
 
+  // Groupe/classe cible. Optionnel : null/absent => cours visible par tous
+  // les étudiants ; un UUID => cours réservé aux membres de ce groupe.
+  // @IsOptional ignore la validation quand la valeur est null ou absente.
+  @IsOptional()
+  @IsUUID(undefined, { message: 'groupId doit être un UUID valide.' })
+  groupId?: string | null;
+
   // Ressources fournies à la création (0..n). Optionnel : on peut créer
   // un cours vide puis lui ajouter des supports ensuite.
   @IsOptional()

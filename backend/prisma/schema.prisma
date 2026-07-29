@@ -259,6 +259,7 @@ model Group {
 
   students    User[]
   evaluations Exam[]
+  courses     Course[]
 
   @@map("groups")
 }
@@ -404,6 +405,9 @@ model Course {
   // centimes). price = 0 lorsque le cours est gratuit.
   isPaid      Boolean  @default(false) @map("is_paid")
   price       Int      @default(0) // FCFA
+  // Ciblage : cours réservé à un groupe/classe précis. NULL = visible par
+  // tous les étudiants. SetNull : la suppression du groupe rend le cours public.
+  groupId     String?  @map("group_id") @db.Uuid
   authorId    String?  @map("author_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -411,11 +415,13 @@ model Course {
   // Restrict : on ne supprime pas une matière tant qu'elle porte des cours.
   subject     Subject            @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   author      User?              @relation("CourseAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  group       Group?             @relation(fields: [groupId], references: [id], onDelete: SetNull)
   resources   CourseResource[]
   accesses    CourseAccess[]
   attendances CourseAttendance[]
 
   @@index([subjectId])
+  @@index([groupId])
   @@map("courses")
 }
 

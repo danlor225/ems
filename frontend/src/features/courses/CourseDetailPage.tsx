@@ -135,6 +135,11 @@ export function CourseDetailPage() {
             {data.subject.name}
           </p>
         )}
+        {data.group && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Cours réservé au groupe {data.group.name}
+          </p>
+        )}
         {data.description && (
           <p className="mt-3 text-sm text-muted-foreground">
             {data.description}

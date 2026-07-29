@@ -36,9 +36,10 @@ import { GrantAccessDto } from './dto/grant-access.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { courseUploadMulter } from './upload.config';
 
-// Réduit l'utilisateur JWT à ce dont le service a besoin (id + rôle).
+// Réduit l'utilisateur JWT à ce dont le service a besoin (id + rôle +
+// groupe, ce dernier servant à filtrer les cours réservés à un groupe).
 function actor(user: SafeUser) {
-  return { id: user.id, role: user.role };
+  return { id: user.id, role: user.role, groupId: user.groupId };
 }
 
 @UseGuards(JwtAuthGuard, RolesGuard)

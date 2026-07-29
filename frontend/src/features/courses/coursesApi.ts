@@ -24,10 +24,12 @@ export interface CourseListItem {
   isPaid: boolean
   price: number // FCFA
   subjectId: string
+  groupId: string | null // null = visible par tous
   authorId: string | null
   createdAt: string
   updatedAt: string
   subject: { id: string; name: string } | null
+  group: { id: string; name: string } | null
   author: { id: string; firstName: string; lastName: string } | null
   _count: { resources: number }
 }
@@ -55,6 +57,7 @@ export interface CourseInput {
   isPublished?: boolean
   isPaid?: boolean
   price?: number
+  groupId?: string | null // null = cours public
   resources?: CourseResourceInput[]
 }
 

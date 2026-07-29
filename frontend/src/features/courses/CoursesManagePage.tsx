@@ -28,6 +28,7 @@ import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
+import { getGroups } from '../groups/groupsApi'
 import { getSubjects } from '../subjects/subjectsApi'
 import {
   createCourse,
@@ -58,6 +59,8 @@ const schema = z.object({
   // Prix en FCFA (entier >= 0). La conversion chaîne->nombre est faite à
   // la source par l'<input> (register avec valueAsNumber).
   price: z.number().int().min(0, 'Prix invalide.'),
+  // Groupe cible : '' = tous les étudiants ; sinon l'id du groupe.
+  groupId: z.string().optional(),
   resources: z.array(resourceSchema),
 })
 type FormValues = z.infer<typeof schema>
@@ -69,6 +72,7 @@ const EMPTY: FormValues = {
   isPublished: false,
   isPaid: false,
   price: 0,
+  groupId: '',
   resources: [],
 }
 
@@ -90,6 +94,10 @@ export function CoursesManagePage() {
   const { data: subjects } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => getSubjects(),
+  })
+  const { data: groups } = useQuery({
+    queryKey: ['groups'],
+    queryFn: () => getGroups({ limit: 100 }),
   })
 
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
@@ -149,6 +157,8 @@ export function CoursesManagePage() {
         isPublished: v.isPublished ?? false,
         isPaid: v.isPaid ?? false,
         price: v.isPaid ? v.price : 0,
+        // '' => null (cours public) ; sinon l'id du groupe cible.
+        groupId: v.groupId || null,
         resources: v.resources,
       }
       return editingId ? updateCourse(editingId, body) : createCourse(body)
@@ -189,6 +199,7 @@ export function CoursesManagePage() {
       isPublished: course.isPublished,
       isPaid: course.isPaid,
       price: course.price,
+      groupId: course.groupId ?? '',
       resources: course.resources.map((r) => ({
         type: r.type,
         title: r.title,
@@ -263,7 +274,11 @@ export function CoursesManagePage() {
                     {course.subject.name}
                   </p>
                 )}
-                <p className="mt-2 text-xs text-muted-foreground">
+                <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Users className="size-3.5" />
+                  {course.group ? `Réservé à ${course.group.name}` : 'Tous les étudiants'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
                   {course._count.resources} ressource
                   {course._count.resources > 1 ? 's' : ''}
                 </p>
@@ -353,6 +368,25 @@ export function CoursesManagePage() {
                 {errors.subjectId.message}
               </p>
             )}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-foreground">
+              Groupe cible
+            </label>
+            <NativeSelect {...register('groupId')}>
+              <option value="">Tous les étudiants</option>
+              {groups?.data.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                  {g.level ? ` (${g.level})` : ''}
+                </option>
+              ))}
+            </NativeSelect>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Réserve le cours aux étudiants d'un groupe précis, ou laisse
+              « Tous » pour le rendre public.
+            </p>
           </div>
 
           <div>
