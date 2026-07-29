@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   Award,
   BarChart3,
+  BookOpen,
   ClipboardList,
   FileBarChart2,
   Home,
@@ -37,6 +38,7 @@ const EASE = [0.16, 1, 0.3, 1] as const
 const STAFF_NAV: NavItem[] = [
   { label: 'Dashboard', to: '/', icon: LayoutDashboard },
   { label: 'Évaluations', to: '/evaluations', icon: ClipboardList },
+  { label: 'Cours', to: '/admin/cours', icon: BookOpen },
   { label: 'Résultats', to: '/admin/resultats', icon: BarChart3 },
   { label: 'Banque de Questions', to: '/admin/questions', icon: ListChecks },
   { label: 'Utilisateurs', to: '/admin/utilisateurs', icon: Users, adminOnly: true },
@@ -47,6 +49,7 @@ const STAFF_NAV: NavItem[] = [
 ]
 const STUDENT_NAV: NavItem[] = [
   { label: 'Accueil', to: '/', icon: Home },
+  { label: 'Cours', to: '/cours', icon: BookOpen },
   { label: 'Mes résultats', to: '/', icon: Award },
   { label: 'Paramètres', to: '/parametres', icon: Settings },
 ]

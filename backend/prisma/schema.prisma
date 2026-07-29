@@ -29,22 +29,32 @@ enum Role {
 }
 
 enum QuestionType {
-  SINGLE_CHOICE   // QCM à réponse unique
-  TRUE_FALSE      // Vrai / Faux (choix unique à 2 options)
+  SINGLE_CHOICE // QCM à réponse unique
+  TRUE_FALSE // Vrai / Faux (choix unique à 2 options)
   MULTIPLE_CHOICE // QCM à réponses multiples (plusieurs bonnes options)
-  SHORT_ANSWER    // Réponse libre (texte) corrigée par correspondance
+  SHORT_ANSWER // Réponse libre (texte) corrigée par correspondance
 }
 
 enum SessionStatus {
   SCHEDULED // planifiée, pas encore ouverte
-  OPEN      // ouverte : les étudiants peuvent passer
-  CLOSED    // fermée
+  OPEN // ouverte : les étudiants peuvent passer
+  CLOSED // fermée
 }
 
 enum AttemptStatus {
   IN_PROGRESS // tentative en cours
-  SUBMITTED   // soumise (score calculé)
-  EXPIRED     // temps écoulé sans soumission
+  SUBMITTED // soumise (score calculé)
+  EXPIRED // temps écoulé sans soumission
+}
+
+enum CourseResourceType {
+  DOCUMENT // support physique : PDF, diapositives, polycopié…
+  VIDEO // vidéo : lien embarqué (YouTube/Vimeo) ou fichier
+}
+
+enum CourseAccessSource {
+  MANUAL // accès accordé par un staff (simule l'achat en l'absence de passerelle)
+  PAYMENT // accès débloqué par une future passerelle de paiement FCFA
 }
 
 // ------------------------------------------------------------
@@ -71,13 +81,19 @@ model User {
   matricule String? @unique @db.VarChar(50) // identifiant étudiant (optionnel, unique)
   groupId   String? @map("group_id") @db.Uuid
 
-  refreshTokens        RefreshToken[]
-  attempts             Attempt[]
-  activityLogs         ActivityLog[]
-  evaluationsAuthored  Exam[]         @relation("EvaluationAuthor")
-  loginHistory         LoginHistory[]
-  certificatesIssued   Certificate[]  @relation("CertificateIssuer")
-  group                Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  refreshTokens       RefreshToken[]
+  attempts            Attempt[]
+  activityLogs        ActivityLog[]
+  evaluationsAuthored Exam[]         @relation("EvaluationAuthor")
+  coursesAuthored     Course[]       @relation("CourseAuthor")
+  loginHistory        LoginHistory[]
+  certificatesIssued  Certificate[]  @relation("CertificateIssuer")
+  group               Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  // Cours : accès (cours payants) et présences (auto-déclarées).
+  courseAccesses      CourseAccess[]     @relation("CourseAccessStudent")
+  courseAccessGranted CourseAccess[]     @relation("CourseAccessGrantedBy")
+  courseAttendances   CourseAttendance[] @relation("CourseAttendanceStudent")
 
   @@index([groupId])
   @@map("users")
@@ -123,6 +139,7 @@ model Subject {
 
   questions Question[]
   exams     Exam[]
+  courses   Course[]
 
   @@map("subjects")
 }
@@ -300,14 +317,14 @@ model Attempt {
 }
 
 model AttemptAnswer {
-  id               String   @id @default(uuid()) @db.Uuid
-  attemptId        String   @map("attempt_id") @db.Uuid
-  questionId       String   @map("question_id") @db.Uuid
-  selectedOptionId String?  @map("selected_option_id") @db.Uuid // choix unique (SINGLE_CHOICE / TRUE_FALSE)
-  selectedOptionIds Json?   @map("selected_option_ids") // choix multiples (MULTIPLE_CHOICE) : tableau d'ids
-  textAnswer       String?  @map("text_answer") // réponse libre (SHORT_ANSWER)
-  optionOrder      Json     @map("option_order") // ordre aléatoire des réponses, FIGÉ par tentative
-  answeredAt       DateTime @default(now()) @map("answered_at")
+  id                String   @id @default(uuid()) @db.Uuid
+  attemptId         String   @map("attempt_id") @db.Uuid
+  questionId        String   @map("question_id") @db.Uuid
+  selectedOptionId  String?  @map("selected_option_id") @db.Uuid // choix unique (SINGLE_CHOICE / TRUE_FALSE)
+  selectedOptionIds Json?    @map("selected_option_ids") // choix multiples (MULTIPLE_CHOICE) : tableau d'ids
+  textAnswer        String?  @map("text_answer") // réponse libre (SHORT_ANSWER)
+  optionOrder       Json     @map("option_order") // ordre aléatoire des réponses, FIGÉ par tentative
+  answeredAt        DateTime @default(now()) @map("answered_at")
 
   attempt        Attempt       @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   question       Question      @relation(fields: [questionId], references: [id], onDelete: Restrict)
@@ -369,4 +386,91 @@ model ActivityLog {
   @@index([actorId])
   @@index([createdAt])
   @@map("activity_logs")
+}
+
+// ------------------------------------------------------------
+//  COURS (supports pédagogiques : documents & vidéos)
+// ------------------------------------------------------------
+
+// Un cours regroupe des supports (documents, vidéos) autour d'une
+// matière. Rédigé par un TEACHER/ADMIN, consultable par tous.
+model Course {
+  id          String   @id @default(uuid()) @db.Uuid
+  subjectId   String   @map("subject_id") @db.Uuid
+  title       String   @db.VarChar(200)
+  description String?
+  isPublished Boolean  @default(false) @map("is_published")
+  // Monétisation : cours payant ou gratuit. Prix en FCFA (entier, sans
+  // centimes). price = 0 lorsque le cours est gratuit.
+  isPaid      Boolean  @default(false) @map("is_paid")
+  price       Int      @default(0) // FCFA
+  authorId    String?  @map("author_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Restrict : on ne supprime pas une matière tant qu'elle porte des cours.
+  subject     Subject            @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  author      User?              @relation("CourseAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  resources   CourseResource[]
+  accesses    CourseAccess[]
+  attendances CourseAttendance[]
+
+  @@index([subjectId])
+  @@map("courses")
+}
+
+// Une ressource = un support unitaire du cours (un PDF, une vidéo…).
+// Cascade : supprimer le cours supprime ses ressources (composition).
+model CourseResource {
+  id        String             @id @default(uuid()) @db.Uuid
+  courseId  String             @map("course_id") @db.Uuid
+  type      CourseResourceType
+  title     String             @db.VarChar(200)
+  url       String // lien externe OU fichier téléversé (Phase D)
+  order     Int                @default(0) // ordre d'affichage dans le cours
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@map("course_resources")
+}
+
+// Droit d'accès d'un étudiant à un cours PAYANT. Sa présence débloque
+// les ressources ; son absence les verrouille. Un seul accès par binôme
+// (course, student). En l'absence de passerelle, le staff l'accorde
+// (source MANUAL) ; un paiement futur créera une entrée source PAYMENT.
+model CourseAccess {
+  id          String             @id @default(uuid()) @db.Uuid
+  courseId    String             @map("course_id") @db.Uuid
+  studentId   String             @map("student_id") @db.Uuid
+  source      CourseAccessSource @default(MANUAL)
+  grantedById String?            @map("granted_by_id") @db.Uuid // staff ayant accordé (si MANUAL)
+  createdAt   DateTime           @default(now()) @map("created_at")
+
+  course    Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student   User   @relation("CourseAccessStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  grantedBy User?  @relation("CourseAccessGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([courseId, studentId])
+  @@index([courseId])
+  @@index([studentId])
+  @@map("course_access")
+}
+
+// Feuille de présence : auto-déclaration de l'étudiant (« je suis présent »).
+// La simple existence d'une ligne = étudiant présent. Un seul enregistrement
+// par binôme (course, student).
+model CourseAttendance {
+  id        String   @id @default(uuid()) @db.Uuid
+  courseId  String   @map("course_id") @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  markedAt  DateTime @default(now()) @map("marked_at")
+
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student User   @relation("CourseAttendanceStudent", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, studentId])
+  @@index([courseId])
+  @@map("course_attendance")
 }

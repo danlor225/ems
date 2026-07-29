@@ -19,6 +19,7 @@ import { EvaluationsModule } from './modules/evaluations/evaluations.module';
 import { GroupsModule } from './modules/groups/groups.module';
 import { CertificatesModule } from './modules/certificates/certificates.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { CoursesModule } from './modules/courses/courses.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -61,6 +62,8 @@ import { validateEnv } from './config/env.validation';
     CertificatesModule,
     // v2 : rapports analytiques agrégés (routes /api/reports/...).
     ReportsModule,
+    // v2 : cours & supports pédagogiques (routes /api/courses/...).
+    CoursesModule,
   ],
   controllers: [AppController],
   providers: [

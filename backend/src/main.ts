@@ -1,19 +1,31 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
+import { mkdirSync } from 'fs';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { FILES_ROUTE, UPLOADS_DIR } from './modules/courses/upload.config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // NestExpressApplication : nécessaire pour servir des fichiers statiques
+  // (useStaticAssets) — les supports de cours téléversés.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // ConfigService : accès typé aux variables validées.
   const config = app.get(ConfigService);
 
   // 1) Helmet : ajoute des en-têtes HTTP de sécurité (protège contre plusieurs
   //    attaques : clickjacking, sniffing MIME, etc.) — OWASP A05.
-  app.use(helmet());
+  //    crossOriginResourcePolicy 'cross-origin' : le front (autre origine)
+  //    doit pouvoir CHARGER les fichiers servis (<img>, <video>, <iframe>).
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+  // Fichiers téléversés : on garantit l'existence du dossier puis on les
+  // sert en statique sous /api/files/<nom> (lecture publique des supports).
+  mkdirSync(UPLOADS_DIR, { recursive: true });
+  app.useStaticAssets(UPLOADS_DIR, { prefix: FILES_ROUTE });
 
   // 2) CORS : seule l'origine du front est autorisée à appeler l'API.
   //    credentials: true => nécessaire pour envoyer/recevoir les cookies (refresh token).

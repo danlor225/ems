@@ -90,6 +90,21 @@ const ResultsPage = lazy(() =>
     default: m.ResultsPage,
   })),
 )
+const CoursesListPage = lazy(() =>
+  import('./features/courses/CoursesListPage').then((m) => ({
+    default: m.CoursesListPage,
+  })),
+)
+const CourseDetailPage = lazy(() =>
+  import('./features/courses/CourseDetailPage').then((m) => ({
+    default: m.CourseDetailPage,
+  })),
+)
+const CoursesManagePage = lazy(() =>
+  import('./features/courses/CoursesManagePage').then((m) => ({
+    default: m.CoursesManagePage,
+  })),
+)
 const ExamPage = lazy(() =>
   import('./features/exam/ExamPage').then((m) => ({ default: m.ExamPage })),
 )
@@ -125,6 +140,9 @@ export default function App() {
         >
           <Route path="/" element={<DashboardPage />} />
           <Route path="/parametres" element={<SettingsPage />} />
+          {/* Cours : consultation ouverte à tous les rôles connectés */}
+          <Route path="/cours" element={<CoursesListPage />} />
+          <Route path="/cours/:id" element={<CourseDetailPage />} />
         </Route>
 
         {/* Coquille admin (TEACHER/ADMIN) */}
@@ -157,6 +175,9 @@ export default function App() {
 
           {/* v2 : module Rapports */}
           <Route path="/admin/rapports" element={<ReportsPage />} />
+
+          {/* v2 : module Cours (gestion staff) */}
+          <Route path="/admin/cours" element={<CoursesManagePage />} />
         </Route>
 
         {/* Coquille strictement ADMIN */}

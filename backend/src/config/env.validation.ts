@@ -37,6 +37,12 @@ const envSchema = z.object({
   // Optionnel : si absent, on retombe sur http://localhost:FRONTEND_PORT (pratique en DEV).
   CORS_ORIGIN: z.string().min(1).optional(),
 
+  // Dossier de stockage des fichiers téléversés (supports de cours).
+  //  - DEV  : chemin relatif 'uploads' (résolu depuis backend/).
+  //  - PROD : chemin d'un VOLUME PERSISTANT monté, ex '/data/uploads'
+  //           (Railway efface le disque local à chaque redéploiement).
+  UPLOADS_DIR: z.string().min(1).default('uploads'),
+
   // Politique SameSite du cookie de refresh (voir auth.cookie.ts).
   //  - 'strict' : front + API sur la même origine (reverse proxy unique).
   //  - 'lax'    : sous-domaines d'un même domaine racine (Railway + Vercel + domaine perso).
