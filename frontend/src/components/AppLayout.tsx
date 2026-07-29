@@ -50,7 +50,7 @@ const STAFF_NAV: NavItem[] = [
 const STUDENT_NAV: NavItem[] = [
   { label: 'Accueil', to: '/', icon: Home },
   { label: 'Cours', to: '/cours', icon: BookOpen },
-  { label: 'Mes résultats', to: '/', icon: Award },
+  { label: 'Mes résultats', to: '/mes-resultats', icon: Award },
   { label: 'Paramètres', to: '/parametres', icon: Settings },
 ]
 

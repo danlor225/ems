@@ -111,6 +111,11 @@ const ExamPage = lazy(() =>
 const StudentResultPage = lazy(() =>
   import('./features/exam/ResultPage').then((m) => ({ default: m.ResultPage })),
 )
+const StudentResultsPage = lazy(() =>
+  import('./features/student/StudentResultsPage').then((m) => ({
+    default: m.StudentResultsPage,
+  })),
+)
 
 function PageLoader() {
   return (
@@ -143,6 +148,8 @@ export default function App() {
           {/* Cours : consultation ouverte à tous les rôles connectés */}
           <Route path="/cours" element={<CoursesListPage />} />
           <Route path="/cours/:id" element={<CourseDetailPage />} />
+          {/* Historique des résultats de l'étudiant connecté */}
+          <Route path="/mes-resultats" element={<StudentResultsPage />} />
         </Route>
 
         {/* Coquille admin (TEACHER/ADMIN) */}
